@@ -1,9 +1,3 @@
-export default function KpiCard({ label, value, sub, tone = 'text-clay-500' }) {
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-stone-100">
-      <div className="text-xs text-stone-500">{label}</div>
-      <div className="text-3xl font-extrabold text-stone-900">{value}</div>
-      <div className={`text-xs font-semibold ${tone}`}>{sub}</div>
-    </div>
-  );
+export default function KpiCard({ label, value, sub }) {
+  return <div className="card"><div style={{fontSize:12,opacity:.7}}>{label}</div><div style={{fontSize:28,fontWeight:800}}>{value}</div><div style={{fontSize:12}}>{sub}</div></div>;
 }
