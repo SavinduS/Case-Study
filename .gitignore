@@ -1,0 +1,15 @@
+# node
+node_modules/
+dist/
+build/
+.expo/
+*.log
+
+# env
+.env
+.env.local
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
