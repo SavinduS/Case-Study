@@ -18,7 +18,7 @@ import {
   GpsState,
   requestLocationPermission
 } from './src/services/location';
-import { enqueue, flushQueue } from './src/services/offlineQueue';
+import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offlineQueue';
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
@@ -160,6 +160,12 @@ export default function App() {
 
     try {
       const result = await createReport({ ...data, photoUrl });
+      const storedPayload = { ...data, ...(photoUrl ? { photoUrl } : {}) };
+      try {
+        await recordOnlineSuccess(result, storedPayload);
+      } catch {
+        // local history is best-effort; the confirmation screen still shows the id
+      }
       setConfirmation(result);
       setSubmitting(false);
       setView('success');

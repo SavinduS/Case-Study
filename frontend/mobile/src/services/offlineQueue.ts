@@ -1,8 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkError, syncReports, uploadPhoto } from '../api/client';
-import type { QueuedReport, ReportSubmission } from '../types';
+import type {
+  ConflictReportConfirmation,
+  QueuedReport,
+  ReportSubmission
+} from '../types';
 
 const STORAGE_KEY = '@wildlife-alert/conflict-report-queue';
+const MAX_HISTORY = 50;
 
 export function newClientRefId(): string {
   return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -19,6 +24,41 @@ export async function loadQueue(): Promise<QueuedReport[]> {
 
 async function saveQueue(queue: QueuedReport[]): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+}
+
+// Keep every pending item plus the newest RECEIVED ones (local history)
+function prune(queue: QueuedReport[]): QueuedReport[] {
+  const pending = queue.filter((q) => q.status === 'PENDING_UPLOAD');
+  const received = queue
+    .filter((q) => q.status === 'RECEIVED')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, MAX_HISTORY);
+  return [...pending, ...received];
+}
+
+// All reports this device knows about, newest first: still on the device
+// (PENDING_UPLOAD) and already uploaded (RECEIVED) — used by My Reports.
+export async function listReports(): Promise<QueuedReport[]> {
+  const queue = await loadQueue();
+  return [...queue].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// The server accepted an online submission — keep it in the local history so
+// the villager can still see the CR- id after leaving the success screen.
+export async function recordOnlineSuccess(
+  confirmation: ConflictReportConfirmation,
+  payload: ReportSubmission
+): Promise<void> {
+  const queue = await loadQueue();
+  if (queue.some((q) => q.reportId === confirmation.reportId)) return;
+  queue.push({
+    clientRefId: newClientRefId(),
+    payload,
+    status: 'RECEIVED',
+    reportId: confirmation.reportId,
+    createdAt: confirmation.createdAt
+  });
+  await saveQueue(prune(queue));
 }
 
 // FR-13: store a report locally with a client-generated reference
