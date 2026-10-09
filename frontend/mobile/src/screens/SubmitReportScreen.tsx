@@ -12,6 +12,7 @@ import IncidentTypePicker from '../components/IncidentTypePicker';
 import LocationCard from '../components/LocationCard';
 import PhotoPicker from '../components/PhotoPicker';
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsState } from '../services/location';
 import { sectorLabel } from '../services/sectors';
@@ -86,17 +87,11 @@ export default function SubmitReportScreen({
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScreenHeader title="Submit Conflict Report" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.titleRow}>
-          <View style={styles.titleText}>
-            <Text style={styles.appName}>Wildlife Alert</Text>
-            <Text style={styles.title}>Submit Conflict Report</Text>
-          </View>
-        </View>
-
         {serverError ? <StatusBanner tone="error" title="Report not sent" message={serverError} /> : null}
 
         <Text style={styles.label}>
@@ -160,30 +155,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     backgroundColor: colors.bg
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md
-  },
-  titleText: {
-    flex: 1
-  },
   submitBlock: {
     marginTop: spacing.lg
-  },
-  appName: {
-    color: colors.primary,
-    fontSize: font.small,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1
-  },
-  title: {
-    color: colors.text,
-    fontSize: font.title,
-    fontWeight: '800',
-    marginTop: 2
   },
   label: {
     color: colors.text,

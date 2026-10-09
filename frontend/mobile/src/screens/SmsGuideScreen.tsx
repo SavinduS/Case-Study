@@ -1,15 +1,13 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import ScreenHeader from "../components/ScreenHeader";
 import { SMS_AREA_CODES, SMS_HOTLINE, SMS_TYPE_CODES } from "../constants/sms";
 import { colors, font, radius, spacing } from "../theme";
 
 export default function SmsGuideScreen() {
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerSpacer} />
-        <Text style={styles.title}>SMS Reporting Guide</Text>
-      </View>
+      <ScreenHeader title="SMS Reporting Guide" />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.intro}>
@@ -70,25 +68,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerSpacer: {
-    width: 70,
-  },
-  title: {
-    flex: 1,
-    textAlign: "center",
-    color: colors.text,
-    fontSize: font.section,
-    fontWeight: "700",
   },
   content: {
     padding: spacing.md,
