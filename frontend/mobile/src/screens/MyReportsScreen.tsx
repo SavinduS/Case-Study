@@ -8,9 +8,11 @@ import {
   Text,
   View
 } from 'react-native';
-import { ApiError, getReport } from '../api/client';
+import { ApiError, getReport, pingServer } from '../api/client';
 import { INCIDENT_LABELS } from '../constants/incidentTypes';
+import { API_BASE_URL } from '../config';
 import { listReports } from '../services/offlineQueue';
+import StatusBanner from '../components/StatusBanner';
 import { colors, font, radius, spacing } from '../theme';
 import type { QueuedReport } from '../types';
 
@@ -18,6 +20,8 @@ interface Props {
   onBack: () => void;
   onRefreshReports: () => Promise<void>;
 }
+
+type ServerState = 'checking' | 'up' | 'down';
 
 type LiveState =
   | { state: 'loading' }
@@ -33,6 +37,7 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [server, setServer] = useState<ServerState>('checking');
   const [live, setLive] = useState<Record<string, LiveState>>({});
 
   const reload = useCallback(async () => {
@@ -41,9 +46,15 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
     setLoadingList(false);
   }, []);
 
+  const checkServer = useCallback(async () => {
+    setServer('checking');
+    setServer((await pingServer()) ? 'up' : 'down');
+  }, []);
+
   useEffect(() => {
     void reload();
-  }, [reload]);
+    void checkServer();
+  }, [reload, checkServer]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -52,8 +63,8 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
     } finally {
       setRefreshing(false);
     }
-    await reload();
-  }, [onRefreshReports, reload]);
+    await Promise.all([reload(), checkServer()]);
+  }, [onRefreshReports, reload, checkServer]);
 
   async function checkStatus(item: QueuedReport) {
     const reportId = item.reportId;
@@ -154,6 +165,20 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
         </Pressable>
       </View>
 
+      <View style={styles.bannerWrap}>
+        {server === 'checking' ? (
+          <StatusBanner tone="offline" title="Checking server connection…" />
+        ) : server === 'up' ? (
+          <StatusBanner tone="success" title="Server reachable" message={API_BASE_URL} />
+        ) : (
+          <StatusBanner
+            tone="error"
+            title="Server NOT reachable"
+            message={`Cannot reach ${API_BASE_URL}. Check EXPO_PUBLIC_API_BASE_URL in frontend/mobile/.env and allow Node.js through the Windows firewall. Reports stay on this device until the server is reachable.`}
+          />
+        )}
+      </View>
+
       <FlatList
         data={entries}
         keyExtractor={(item) => `${item.clientRefId}-${item.reportId ?? 'pending'}`}
@@ -197,6 +222,10 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: font.body,
     fontWeight: '600'
+  },
+  bannerWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md
   },
   title: {
     flex: 1,

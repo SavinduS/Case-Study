@@ -35,6 +35,7 @@ export interface SyncResult {
   reportId?: string;
   status?: string;
   alreadySynced?: boolean;
+  message?: string | null;
   errors?: Record<string, string> | null;
 }
 

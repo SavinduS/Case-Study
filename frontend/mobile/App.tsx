@@ -121,6 +121,15 @@ export default function App() {
     return unsubscribe;
   }, [detectLocation, flushSavedReports]);
 
+  // The reconnect event can fire before the network actually works — keep
+  // retrying while the app is open so pending rows never wait for a manual tap
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void flushSavedReports();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [flushSavedReports]);
+
   // FR-13: server unreachable → keep the report on the device
   async function saveOffline(data: SubmitData, uploadedPhotoUrl?: string) {
     try {
