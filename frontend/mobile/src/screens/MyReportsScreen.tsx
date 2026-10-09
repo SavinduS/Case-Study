@@ -16,7 +16,6 @@ import { colors, font, radius, spacing } from '../theme';
 import type { QueuedReport } from '../types';
 
 interface Props {
-  onBack: () => void;
   onRefreshReports: () => Promise<void>;
 }
 
@@ -36,7 +35,7 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
+export default function MyReportsScreen({ onRefreshReports }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -151,14 +150,7 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to report form"
-          onPress={onBack}
-          style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.headerLink}>← Back</Text>
-        </Pressable>
+        <View style={styles.headerSpacer} />
         <Text style={styles.title}>My Reports</Text>
         <Pressable
           accessibilityRole="button"
@@ -223,6 +215,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
+  },
+  headerSpacer: {
+    width: 70
   },
   headerLink: {
     color: colors.primary,
