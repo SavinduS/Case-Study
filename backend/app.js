@@ -4,16 +4,36 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// Dev visibility: log every request so you can confirm the phone is reaching
-// this machine (skipped during tests)
+// JSON APIs gain nothing from ETags — and conditional revalidation makes
+// healthy clients see 304s, which the mobile app's reachability probe
+// (res.ok) misreads as "server down". Disable them entirely.
+app.set('etag', false);
+
+// Dev visibility (skipped during tests). Logs three moments so you can tell
+// apart "request never arrived" / "server responded" / "client gave up":
+//   > POST /api/conflict-reports          arrival
+//   < POST /api/conflict-reports -> 201 (45ms)
+//   x POST /api/conflict-reports aborted after 20001ms (client never got a response)
 if (process.env.NODE_ENV !== 'test') {
   app.use((req, res, next) => {
-    res.on('finish', () => console.log(`${req.method} ${req.originalUrl} -> ${res.statusCode}`));
+    const start = Date.now();
+    console.log(`> ${req.method} ${req.originalUrl}`);
+    res.on('finish', () => {
+      console.log(`< ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - start}ms)`);
+    });
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        console.log(`x ${req.method} ${req.originalUrl} aborted after ${Date.now() - start}ms`);
+      }
+    });
     next();
   });
 }
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ ok: true });
+});
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/incidents', require('./routes/incidents'));

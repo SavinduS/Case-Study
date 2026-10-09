@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import IncidentTypePicker from '../components/IncidentTypePicker';
 import LocationCard from '../components/LocationCard';
 import PhotoPicker from '../components/PhotoPicker';
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsState } from '../services/location';
 import { sectorLabel } from '../services/sectors';
@@ -36,7 +36,6 @@ interface Props {
   photoError: string | null;
   onSubmit: (data: SubmitData) => void;
   onOpenPicker: () => void;
-  onOpenMyReports: () => void;
   onPhotoChange: (uri: string | null) => void;
 }
 
@@ -51,7 +50,6 @@ export default function SubmitReportScreen({
   photoError,
   onSubmit,
   onOpenPicker,
-  onOpenMyReports,
   onPhotoChange
 }: Props) {
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
@@ -89,25 +87,11 @@ export default function SubmitReportScreen({
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScreenHeader title="Submit Conflict Report" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.titleRow}>
-          <View style={styles.titleText}>
-            <Text style={styles.appName}>Wildlife Alert</Text>
-            <Text style={styles.title}>Submit Conflict Report</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open My Reports"
-            onPress={onOpenMyReports}
-            style={({ pressed }) => [styles.myReportsButton, pressed && styles.myReportsPressed]}
-          >
-            <Text style={styles.myReportsLink}>My Reports →</Text>
-          </Pressable>
-        </View>
-
         {serverError ? <StatusBanner tone="error" title="Report not sent" message={serverError} /> : null}
 
         <Text style={styles.label}>
@@ -146,12 +130,14 @@ export default function SubmitReportScreen({
           onChange={onPhotoChange}
         />
 
-        <PrimaryButton
-          label="Submit Report"
-          onPress={handleSubmit}
-          loading={submitting}
-          disabled={submitting}
-        />
+        <View style={styles.submitBlock}>
+          <PrimaryButton
+            label="Submit Report"
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={submitting}
+          />
+        </View>
         <Text style={styles.footnote}>
           Your report will be confirmed after it is received by the system.
         </Text>
@@ -169,40 +155,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     backgroundColor: colors.bg
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md
-  },
-  titleText: {
-    flex: 1
-  },
-  myReportsButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm
-  },
-  myReportsPressed: {
-    opacity: 0.6
-  },
-  myReportsLink: {
-    color: colors.primary,
-    fontSize: font.small,
-    fontWeight: '700'
-  },
-  appName: {
-    color: colors.primary,
-    fontSize: font.small,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1
-  },
-  title: {
-    color: colors.text,
-    fontSize: font.title,
-    fontWeight: '800',
-    marginTop: 2
+  submitBlock: {
+    marginTop: spacing.lg
   },
   label: {
     color: colors.text,

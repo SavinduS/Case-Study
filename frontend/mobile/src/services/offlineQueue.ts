@@ -145,9 +145,14 @@ export async function flushQueue(): Promise<FlushResult> {
       try {
         item.payload.photoUrl = await uploadPhoto(item.photoUri);
         item.photoUri = undefined;
+        item.lastError = undefined;
         changed.add(item.clientRefId);
       } catch (e) {
         if (e instanceof NetworkError) {
+          // Never fail silently: say why this row is still pending, then stop
+          // the batch (no connection → the sync would fail the same way).
+          item.lastError = 'Photo upload interrupted — waiting for a connection';
+          changed.add(item.clientRefId);
           remaining.push(...pending.slice(i));
           break;
         }
