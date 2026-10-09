@@ -38,11 +38,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const base = await getBaseUrl();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const method = options.method ?? 'GET';
+  const url = `${base}${path}`;
+  // Phone-side trace — appears in the Metro terminal
+  console.log(`[api] → ${method} ${url}`);
 
   let res: Response;
   try {
-    res = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
-  } catch {
+    res = await fetch(url, { ...options, headers, signal: controller.signal });
+    console.log(`[api] ${res.ok ? '✓' : '!'} ${res.status} ${method} ${url}`);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.log(`[api] ✗ ${method} ${url} — ${reason}`);
     invalidateBaseUrl(base);
     throw new NetworkError(base);
   } finally {
