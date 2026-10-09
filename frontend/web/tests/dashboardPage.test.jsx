@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import DashboardPage from '../src/features/collar-alerts/pages/DashboardPage.jsx';
@@ -102,6 +102,11 @@ function hookResult(overrides = {}) {
   };
 }
 
+// The rail is mirrored by a compact switcher on narrow screens, so tests that
+// mean "the rail" scope to the aside rather than matching a button name globally.
+const railButton = (name) =>
+  within(screen.getByRole('complementary', { name: 'Modules' })).getByRole('button', { name });
+
 const renderPage = () => render(<MemoryRouter><DashboardPage /></MemoryRouter>);
 
 beforeEach(() => {
@@ -149,28 +154,51 @@ describe('DashboardPage', () => {
   it('opens the collar registry from the module rail', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Tracked collars' }));
+    await user.click(railButton('Tracked collars'));
     expect(screen.getByRole('region', { name: 'Tracked collars' })).toBeInTheDocument();
   });
 
   it('opens the geofence register from the module rail', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Geofences' }));
+    await user.click(railButton('Geofences'));
     expect(screen.getByRole('region', { name: 'Geofences' })).toBeInTheDocument();
   });
 
   it('hides the queue when another module is open', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Tracked collars' }));
+    await user.click(railButton('Tracked collars'));
     expect(screen.queryByRole('region', { name: 'Active alerts queue' })).not.toBeInTheDocument();
+  });
+
+  it('offers the owned modules in the compact switcher used on phones', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const switcher = screen.getByRole('navigation', { name: 'Modules (compact)' });
+    const names = within(switcher)
+      .getAllByRole('button')
+      .map((b) => b.textContent.trim());
+    // Only the modules this use case owns; other members' modules stay in the rail.
+    expect(names).toEqual(['Tracked collars', 'Active alerts', 'Geofences']);
+  });
+
+  it('switches module from the compact switcher', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const switcher = screen.getByRole('navigation', { name: 'Modules (compact)' });
+    await user.click(within(switcher).getByRole('button', { name: 'Geofences' }));
+    expect(screen.getByRole('region', { name: 'Geofences' })).toBeInTheDocument();
+    expect(within(switcher).getByRole('button', { name: 'Geofences' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('shows another member’s module as a placeholder, not a dead panel', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Field incidents' }));
+    await user.click(railButton('Field incidents'));
     expect(screen.getByRole('heading', { name: 'Field incidents' })).toBeInTheDocument();
     expect(screen.getByText(/Mandinu R P S/)).toBeInTheDocument();
   });
@@ -181,7 +209,7 @@ describe('DashboardPage', () => {
     vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ setZoneEnabled, activeAlert: null }));
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Geofences' }));
+    await user.click(railButton('Geofences'));
     await user.click(screen.getAllByRole('checkbox')[0]);
     // The zone is currently enabled, so the officer is turning it off.
     expect(setZoneEnabled).toHaveBeenCalledWith('Z1', false);

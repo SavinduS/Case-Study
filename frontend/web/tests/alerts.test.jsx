@@ -197,7 +197,39 @@ describe('ActiveAlertsPanel', () => {
   it('counts the open alerts', () => {
     render(<ActiveAlertsPanel alerts={alerts} openCount={2} onSelect={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Active Alerts' })).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    // Rendered twice: the phone sheet handle and the desktop column header.
+    expect(screen.getAllByText('2')).toHaveLength(2);
+  });
+
+  it('offers a sheet handle on a phone, showing the top alert', () => {
+    render(<ActiveAlertsPanel alerts={alerts} openCount={2} onSelect={vi.fn()} />);
+    const handle = screen.getByRole('button', { expanded: false });
+    expect(handle).toBeInTheDocument();
+    expect(handle).toHaveTextContent('Active Alerts');
+    expect(handle).toHaveTextContent('E-402');
+  });
+
+  it('expands and collapses the sheet from the handle', async () => {
+    const user = userEvent.setup();
+    render(<ActiveAlertsPanel alerts={alerts} openCount={2} onSelect={vi.fn()} />);
+    const handle = screen.getByRole('button', { expanded: false });
+    await user.click(handle);
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument();
+  });
+
+  it('collapses the sheet after the officer picks an alert', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<ActiveAlertsPanel alerts={alerts} openCount={2} onSelect={onSelect} />);
+    await user.click(screen.getByRole('button', { expanded: false }));
+    await user.click(screen.getByRole('button', { name: /E-331/ }));
+    expect(onSelect).toHaveBeenCalledWith('CBA-2');
+  });
+
+  it('points the handle at the list it controls', () => {
+    render(<ActiveAlertsPanel alerts={alerts} openCount={2} onSelect={vi.fn()} />);
+    expect(screen.getByRole('button', { expanded: false })).toHaveAttribute('aria-controls', 'active-alerts-list');
+    expect(document.getElementById('active-alerts-list')).toBeInTheDocument();
   });
 
   it('labels a delayed breach for the officer', () => {

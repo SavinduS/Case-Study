@@ -92,7 +92,23 @@ const DashboardMap = forwardRef(function DashboardMap(
 
     L.tileLayer(IMAGERY.url, { attribution: IMAGERY.attribution, maxZoom: IMAGERY.maxZoom }).addTo(map);
     L.tileLayer(STREET.url, { attribution: STREET.attribution, maxZoom: STREET.maxZoom }).addTo(map);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    const zoomControl = L.control.zoom({ position: 'bottomright' });
+    // The sheet covers the bottom of the map below `lg`, so hand zooming to the
+    // control stack there instead of letting Leaflet float over the sheet.
+    let zoomAttached = false;
+    const syncZoomControl = () => {
+      const wide = window.matchMedia('(min-width: 1024px)').matches;
+      if (wide && !zoomAttached) {
+        zoomControl.addTo(map);
+        zoomAttached = true;
+      }
+      if (!wide && zoomAttached) {
+        map.removeControl(zoomControl);
+        zoomAttached = false;
+      }
+    };
+    syncZoomControl();
+    map.on('resize', syncZoomControl);
 
     mapRef.current = map;
     const onViewChange = () => ensureHatchPattern(map);
@@ -102,6 +118,7 @@ const DashboardMap = forwardRef(function DashboardMap(
 
     return () => {
       map.off('zoomend moveend', onViewChange);
+      map.off('resize', syncZoomControl);
       map.remove();
       mapRef.current = null;
       setReady(false);
@@ -114,6 +131,8 @@ const DashboardMap = forwardRef(function DashboardMap(
   useImperativeHandle(
     ref,
     () => ({
+      zoomIn: () => mapRef.current?.zoomIn(),
+      zoomOut: () => mapRef.current?.zoomOut(),
       fitPark: () => {
         const map = mapRef.current;
         const boundary = parkBoundaryRef.current;
@@ -281,6 +300,8 @@ const DashboardMap = forwardRef(function DashboardMap(
   const onControl = useCallback((key) => {
     if (key === 'fit') ref.current?.fitPark?.();
     if (key === 'locate') ref.current?.centreOnBreach?.();
+    if (key === 'zoomIn') ref.current?.zoomIn?.();
+    if (key === 'zoomOut') ref.current?.zoomOut?.();
   }, [ref]);
 
   return (

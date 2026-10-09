@@ -9,8 +9,8 @@ export default function SignalLostBanner({ collarIds, onDismiss }) {
   return (
     <div
       role="alert"
-      className="absolute left-1/2 top-4 z-[750] -translate-x-1/2 rounded-md border border-alert-600/40
-        bg-alert-100 px-4 py-2.5 shadow-lg"
+      className="absolute inset-x-3 top-3 z-[750] rounded-md border border-alert-600/40
+        bg-alert-100 px-3 py-2 shadow-lg md:left-1/2 md:top-4 md:-translate-x-1/2 md:px-4 md:py-2.5"
     >
       <div className="flex items-center gap-3">
         <svg className="h-5 w-5 shrink-0 text-alert-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
