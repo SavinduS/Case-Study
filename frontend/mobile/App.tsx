@@ -16,6 +16,7 @@ import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import ReportPendingScreen from './src/screens/ReportPendingScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
+import SmsGuideScreen from './src/screens/SmsGuideScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
 import {
   getCurrentFix,
@@ -26,7 +27,7 @@ import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offline
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type AppView = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports';
+type AppView = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports' | 'smsGuide';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
@@ -252,6 +253,8 @@ export default function App() {
             />
           ) : view === 'myReports' ? (
             <MyReportsScreen onRefreshReports={flushSavedReports} />
+          ) : view === 'smsGuide' ? (
+            <SmsGuideScreen />
           ) : (
             <SubmitReportScreen
               key={formKey}
@@ -267,9 +270,9 @@ export default function App() {
             />
           )}
         </View>
-        {view === 'form' || view === 'myReports' ? (
-          <TabBar active={view === 'form' ? 'form' : 'myReports'} onSelect={setView} />
-        ) : null}
+        {view === 'success' || view === 'pending' || view === 'pickLocation' ? null : (
+          <TabBar active={view} onSelect={setView} />
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );

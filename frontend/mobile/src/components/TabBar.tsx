@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
-export type TabId = 'form' | 'myReports';
+export type TabId = 'form' | 'myReports' | 'smsGuide';
 
 interface Props {
   active: TabId;
@@ -12,7 +12,8 @@ interface Props {
 
 const TABS: { id: TabId; icon: string; label: string }[] = [
   { id: 'form', icon: '📝', label: 'Submit Report' },
-  { id: 'myReports', icon: '📋', label: 'My Reports' }
+  { id: 'myReports', icon: '📋', label: 'My Reports' },
+  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' }
 ];
 
 export default function TabBar({ active, onSelect }: Props) {
