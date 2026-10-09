@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import IncidentTypePicker from '../components/IncidentTypePicker';
 import LocationCard from '../components/LocationCard';
+import PhotoPicker from '../components/PhotoPicker';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsState } from '../services/location';
@@ -30,8 +31,11 @@ interface Props {
   submitting: boolean;
   serverError: string | null;
   fieldErrors: Record<string, string> | null;
+  photoUri: string | null;
+  photoError: string | null;
   onSubmit: (data: SubmitData) => void;
   onOpenPicker: () => void;
+  onPhotoChange: (uri: string | null) => void;
 }
 
 const MAX_DESCRIPTION = 500;
@@ -41,8 +45,11 @@ export default function SubmitReportScreen({
   submitting,
   serverError,
   fieldErrors,
+  photoUri,
+  photoError,
   onSubmit,
-  onOpenPicker
+  onOpenPicker,
+  onPhotoChange
 }: Props) {
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
   const [description, setDescription] = useState('');
@@ -115,6 +122,14 @@ export default function SubmitReportScreen({
         <Text style={styles.counter}>
           {description.length}/{MAX_DESCRIPTION}
         </Text>
+
+        <Text style={styles.label}>Photo (Optional)</Text>
+        <PhotoPicker
+          photoUri={photoUri}
+          photoError={photoError}
+          disabled={submitting}
+          onChange={onPhotoChange}
+        />
 
         <PrimaryButton
           label="Submit Report"

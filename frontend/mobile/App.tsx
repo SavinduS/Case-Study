@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import { ApiError, createReport, NetworkError } from './src/api/client';
+import { ApiError, createReport, NetworkError, uploadPhoto } from './src/api/client';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
@@ -25,6 +25,8 @@ export default function App() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string> | null>(null);
   const [confirmation, setConfirmation] = useState<ConflictReportConfirmation | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const detectLocation = useCallback(async () => {
     setGps({ status: 'detecting', fix: null, manual: false });
@@ -59,8 +61,36 @@ export default function App() {
     setSubmitting(true);
     setServerError(null);
     setFieldErrors(null);
+    setPhotoError(null);
+
+    let photoUrl: string | undefined;
+    if (photoUri) {
+      try {
+        photoUrl = await uploadPhoto(photoUri);
+      } catch (e) {
+        if (e instanceof ApiError) {
+          // E5: villager informed, can retry or remove the photo and submit without it
+          setPhotoError(
+            `Photo could not be uploaded: ${e.message}. Try again, or remove the photo to submit without it.`
+          );
+          setSubmitting(false);
+          return;
+        }
+        if (e instanceof NetworkError) {
+          setServerError(
+            'Your report has not reached the system yet. Check your connection and try again.'
+          );
+          setSubmitting(false);
+          return;
+        }
+        setPhotoError('Photo could not be uploaded. Try again, or remove the photo.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
-      const result = await createReport(data);
+      const result = await createReport({ ...data, photoUrl });
       setConfirmation(result);
       setView('success');
     } catch (e) {
@@ -87,8 +117,15 @@ export default function App() {
     setConfirmation(null);
     setFieldErrors(null);
     setServerError(null);
+    setPhotoUri(null);
+    setPhotoError(null);
     setFormKey((k) => k + 1);
     setView('form');
+  }
+
+  function handlePhotoChange(uri: string | null) {
+    setPhotoUri(uri);
+    setPhotoError(null);
   }
 
   function openLocationPicker() {
@@ -119,8 +156,11 @@ export default function App() {
           submitting={submitting}
           serverError={serverError}
           fieldErrors={fieldErrors}
+          photoUri={photoUri}
+          photoError={photoError}
           onSubmit={handleSubmit}
           onOpenPicker={openLocationPicker}
+          onPhotoChange={handlePhotoChange}
         />
       )}
     </SafeAreaView>
