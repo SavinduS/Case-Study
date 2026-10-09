@@ -1,8 +1,16 @@
+import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import { ApiError, createReport, NetworkError, uploadPhoto } from './src/api/client';
+import {
+  ApiError,
+  createReport,
+  getReport,
+  NetworkError,
+  uploadPhoto
+} from './src/api/client';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
+import ReportPendingScreen from './src/screens/ReportPendingScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
 import {
@@ -10,10 +18,11 @@ import {
   GpsState,
   requestLocationPermission
 } from './src/services/location';
+import { enqueue, flushQueue } from './src/services/offlineQueue';
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type View = 'form' | 'success' | 'pickLocation';
+type View = 'form' | 'success' | 'pickLocation' | 'pending';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
@@ -27,6 +36,15 @@ export default function App() {
   const [formKey, setFormKey] = useState(0);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [pendingLocalRef, setPendingLocalRef] = useState<string | null>(null);
+
+  const pendingRef = useRef<string | null>(null);
+  const flushingRef = useRef(false);
+
+  function setPendingRef(ref: string | null) {
+    pendingRef.current = ref;
+    setPendingLocalRef(ref);
+  }
 
   const detectLocation = useCallback(async () => {
     setGps({ status: 'detecting', fix: null, manual: false });
@@ -53,9 +71,63 @@ export default function App() {
     }
   }, []);
 
+  // FR-14: flush locally saved reports on launch and whenever connectivity returns
+  const flushSavedReports = useCallback(async () => {
+    if (flushingRef.current) return;
+    flushingRef.current = true;
+    try {
+      const result = await flushQueue();
+      const ref = pendingRef.current;
+      if (!ref) return;
+      const item = result.synced.find((i) => i.clientRefId === ref);
+      if (!item?.reportId) return;
+
+      let confirmationData: ConflictReportConfirmation;
+      try {
+        confirmationData = await getReport(item.reportId);
+      } catch {
+        confirmationData = {
+          reportId: item.reportId,
+          status: 'RECEIVED',
+          submissionMethod: 'app',
+          incidentType: item.payload.incidentType,
+          locationText: item.payload.locationText,
+          createdAt: item.createdAt
+        };
+      }
+      setPendingRef(null);
+      setConfirmation(confirmationData);
+      setView('success');
+    } finally {
+      flushingRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     detectLocation();
-  }, [detectLocation]);
+    void flushSavedReports();
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const online = state.isConnected !== false && state.isInternetReachable !== false;
+      if (online) void flushSavedReports();
+    });
+    return unsubscribe;
+  }, [detectLocation, flushSavedReports]);
+
+  // FR-13: server unreachable → keep the report on the device
+  async function saveOffline(data: SubmitData, uploadedPhotoUrl?: string) {
+    try {
+      const entry = await enqueue(
+        { ...data, ...(uploadedPhotoUrl ? { photoUrl: uploadedPhotoUrl } : {}) },
+        uploadedPhotoUrl ? undefined : (photoUri ?? undefined)
+      );
+      setPendingRef(entry.clientRefId);
+      setView('pending');
+    } catch {
+      setServerError('Could not save the report on this device. Free some storage and try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function handleSubmit(data: SubmitData) {
     setSubmitting(true);
@@ -77,10 +149,7 @@ export default function App() {
           return;
         }
         if (e instanceof NetworkError) {
-          setServerError(
-            'Your report has not reached the system yet. Check your connection and try again.'
-          );
-          setSubmitting(false);
+          await saveOffline(data);
           return;
         }
         setPhotoError('Photo could not be uploaded. Try again, or remove the photo.');
@@ -92,6 +161,7 @@ export default function App() {
     try {
       const result = await createReport({ ...data, photoUrl });
       setConfirmation(result);
+      setSubmitting(false);
       setView('success');
     } catch (e) {
       if (e instanceof ApiError) {
@@ -101,15 +171,14 @@ export default function App() {
         } else {
           setServerError(e.message);
         }
+        setSubmitting(false);
       } else if (e instanceof NetworkError) {
-        setServerError(
-          'Your report has not reached the system yet. Check your connection and try again.'
-        );
+        // E3: server unreachable → queue locally, inform that it has not arrived yet
+        await saveOffline(data, photoUrl);
       } else {
         setServerError('Something went wrong. Please try again.');
+        setSubmitting(false);
       }
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -119,6 +188,7 @@ export default function App() {
     setServerError(null);
     setPhotoUri(null);
     setPhotoError(null);
+    setPendingRef(null);
     setFormKey((k) => k + 1);
     setView('form');
   }
@@ -142,6 +212,8 @@ export default function App() {
       <StatusBar style="dark" />
       {view === 'success' && confirmation ? (
         <ReportSuccessScreen confirmation={confirmation} onDone={handleDone} />
+      ) : view === 'pending' && pendingLocalRef ? (
+        <ReportPendingScreen localRef={pendingLocalRef} onDone={handleDone} />
       ) : view === 'pickLocation' ? (
         <LocationPickerScreen
           initialFix={gps.fix}

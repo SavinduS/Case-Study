@@ -53,6 +53,10 @@ export function createReport(body: ReportSubmission): Promise<ConflictReportConf
   });
 }
 
+export function getReport(reportId: string): Promise<ConflictReportConfirmation> {
+  return request<ConflictReportConfirmation>(`/api/conflict-reports/${reportId}`);
+}
+
 export function syncReports(reports: ReportSubmission[]): Promise<SyncResponse> {
   return request<SyncResponse>('/api/conflict-reports/sync', {
     method: 'POST',

@@ -50,4 +50,5 @@ export interface QueuedReport {
   status: 'PENDING_UPLOAD' | 'RECEIVED';
   reportId?: string;
   createdAt: string;
+  lastError?: string;
 }
