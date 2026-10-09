@@ -12,14 +12,19 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["<rootDir>/tests/*.test.js"],
-    "setupFiles": ["<rootDir>/tests/setupEnv.js"]
+    "testMatch": [
+      "<rootDir>/tests/*.test.js"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/setupEnv.js"
+    ]
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.0",
     "express": "^4.19.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb-connection-string-url": "^3.0.2",
     "mongoose": "^8.4.0",
     "multer": "^2.4.0"
   },
