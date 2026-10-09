@@ -32,11 +32,20 @@ function findSectorForPoint(lng, lat) {
   return SECTORS.find((s) => distanceMeters(s.center, [lng, lat]) <= s.radiusMeters) || null;
 }
 
+function findNearestSector(lng, lat) {
+  return SECTORS.reduce((nearest, sector) => {
+    const distance = distanceMeters(sector.center, [lng, lat]);
+    return !nearest || distance < nearest.distanceMeters
+      ? { ...sector, distanceMeters: distance } : nearest;
+  }, null);
+}
+
 module.exports = {
   SECTORS,
   allowOutsideArea: process.env.ALLOW_OUTSIDE_AREA === 'true',
   normalizeSectorCode,
   findSectorByCode,
   findSectorForPoint,
+  findNearestSector,
   distanceMeters
 };

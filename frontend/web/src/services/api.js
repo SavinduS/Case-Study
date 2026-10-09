@@ -78,4 +78,14 @@ export const setGeofenceEnabled = (zoneId, enabled) =>
 export const reportSignalLost = (collarId, lost = true, reason) =>
   request(`/telemetry/collars/${collarId}/signal`, { method: 'PUT', body: { lost, reason } });
 
+// Analytics workspace contract. Kept alongside the shared client so feature
+// pages and consumers can use one API surface.
+export const getAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const getSavedAnalyticsReports = () => request('/analytics/reports');
+export const saveAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const exportAnalyticsReport = (reportId, format) =>
+  request(`/analytics/reports/${encodeURIComponent(reportId)}/export?format=${format}`);
+
 export { ApiError };
