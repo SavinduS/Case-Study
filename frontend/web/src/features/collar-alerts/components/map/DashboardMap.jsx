@@ -1,8 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import L from 'leaflet';
-import { PARK_BOUNDARY } from '../../data/parkData.js';
 import { boundsForRings, toLatLng, toLatLngRing } from './leafletAdapter.js';
-import { THREAT_LEVEL } from '../../domain/constants.js';
+import { THREAT_LEVEL } from '../../domain/labels.js';
 import { collarIcon, breachIcon, rangerIcon, settlementIcon } from './mapIcons.js';
 import MapLegend from './MapLegend.jsx';
 import { ClockChip, StatusChips, ControlStack, useClock } from './MapChrome.jsx';
@@ -69,7 +68,7 @@ function ensureHatchPattern(map) {
  * ranger deployments. Imperative handle drives the map control stack.
  */
 const DashboardMap = forwardRef(function DashboardMap(
-  { collars, zones, totalZoneCount, rangerTeams, settlements, openAlerts, onSelectCollar },
+  { park, collars, zones, rangerTeams, settlements, openAlerts, onSelectCollar },
   ref
 ) {
   const containerRef = useRef(null);
@@ -109,14 +108,18 @@ const DashboardMap = forwardRef(function DashboardMap(
     };
   }, []);
 
+  const parkBoundaryRef = useRef(null);
+  parkBoundaryRef.current = park?.boundary ?? null;
+
   useImperativeHandle(
     ref,
     () => ({
       fitPark: () => {
         const map = mapRef.current;
-        if (!map) return;
+        const boundary = parkBoundaryRef.current;
+        if (!map || !boundary) return;
         map.invalidateSize();
-        map.fitBounds(boundsForRings([PARK_BOUNDARY]), { padding: [40, 40] });
+        map.fitBounds(boundsForRings([boundary]), { padding: [40, 40] });
       },
       centreOnBreach: () => {
         const map = mapRef.current;
@@ -136,25 +139,25 @@ const DashboardMap = forwardRef(function DashboardMap(
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!ready || !map) return;
+    if (!ready || !map || !park?.boundary) return;
     // The map is created before layout settles, so force a size refresh
     // before fitting or the first fitBounds uses a zero-height container.
     map.invalidateSize();
-    map.fitBounds(boundsForRings([PARK_BOUNDARY]), { padding: [40, 40] });
-  }, [ready]);
+    map.fitBounds(boundsForRings([park.boundary]), { padding: [40, 40] });
+  }, [ready, park]);
 
   // Park boundary: red outline, no fill (matches the wireframe).
   useEffect(() => {
     const map = mapRef.current;
-    if (!ready || !map) return undefined;
-    const layer = L.polygon(toLatLngRing(PARK_BOUNDARY), {
+    if (!ready || !map || !park?.boundary) return undefined;
+    const layer = L.polygon(toLatLngRing(park.boundary), {
       color: '#d7263d',
       weight: 2.5,
       fill: false
     }).addTo(map);
-    layer.bindTooltip('Minneriya National Park boundary', { sticky: true });
+    layer.bindTooltip(`${park.name} boundary`, { sticky: true });
     return () => map.removeLayer(layer);
-  }, [ready]);
+  }, [ready, park]);
 
   // High-risk geofences: hatched fill plus a dashed outline.
   useEffect(() => {
@@ -162,7 +165,7 @@ const DashboardMap = forwardRef(function DashboardMap(
     if (!ready || !map) return undefined;
 
     ensureHatchPattern(map);
-    const layers = zones.map((zone) =>
+    const layers = zones.filter((zone) => zone.enabled !== false).map((zone) =>
       L.polygon(toLatLngRing(zone.polygon), {
         color: zone.threatLevel === THREAT_LEVEL.CRITICAL ? '#d7263d' : '#e9a23b',
         weight: 2,
@@ -210,7 +213,8 @@ const DashboardMap = forwardRef(function DashboardMap(
 
     for (const collar of collars) {
       const trail = trailsRef.current.get(collar.collarId) ?? [];
-      trail.push(collar.position);
+      const position = collar.lastKnownLocation.coordinates;
+      trail.push(position);
       if (trail.length > TRAIL_LENGTH) trail.shift();
       trailsRef.current.set(collar.collarId, trail);
 
@@ -225,10 +229,10 @@ const DashboardMap = forwardRef(function DashboardMap(
 
       const marker = collarMarkersRef.current.get(collar.collarId);
       if (marker) {
-        marker.setLatLng(toLatLng(collar.position));
+        marker.setLatLng(toLatLng(position));
         marker.setIcon(collarIcon({ status: collar.status }));
       } else {
-        const created = L.marker(toLatLng(collar.position), {
+        const created = L.marker(toLatLng(position), {
           icon: collarIcon({ status: collar.status }),
           keyboard: true,
           title: `${collar.species} ${collar.collarId}`
@@ -285,8 +289,8 @@ const DashboardMap = forwardRef(function DashboardMap(
       <ClockChip time={clock} />
       <StatusChips
         signalLost={collars.some((collar) => collar.status === 'signal_lost')}
-        visibleZoneCount={zones.length}
-        totalZoneCount={totalZoneCount ?? zones.length}
+        visibleZoneCount={zones.filter((zone) => zone.enabled !== false).length}
+        totalZoneCount={zones.length}
       />
       <ControlStack onAction={onControl} />
       <MapLegend zones={zones} />

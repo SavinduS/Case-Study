@@ -1,34 +1,46 @@
-import { THREAT_LEVEL } from '../domain/constants.js';
-
-/** Minneriya-style park boundary used by the operations dashboard map. */
-export const PARK_BOUNDARY = [
-  [81.055, 8.105],
-  [81.028, 8.14],
-  [81.008, 8.185],
-  [81.0, 8.235],
-  [81.018, 8.282],
-  [81.058, 8.31],
-  [81.108, 8.312],
-  [81.15, 8.285],
-  [81.172, 8.24],
-  [81.168, 8.19],
-  [81.14, 8.148],
-  [81.1, 8.118],
-  [81.055, 8.105]
-];
+const { THREAT_LEVEL, COLLAR_STATUS, RANGER_STATUS } = require('../utils/collarAlertConstants');
 
 /**
- * Pre-configured virtual geofences (precondition: "High-risk zones and
- * virtual geofences are pre-configured in the system database").
- * `kind` distinguishes high-risk zones from the park boundary itself.
+ * Reference data for the operations dashboard: the park boundary and its
+ * surrounding settlements, the pre-configured high-risk geofences, the
+ * tracked collars and the ranger teams.
+ *
+ * Shared by seedReferenceData.js and resetOperationalData.js so both always
+ * agree on the starting state of a demo.
  */
-export const HIGH_RISK_ZONES = [
+const PARK = {
+  parkId: 'KNP-ANP',
+  name: 'Minneriya National Park',
+  district: 'Anuradhapura',
+  boundary: [
+    [81.055, 8.105],
+    [81.028, 8.14],
+    [81.008, 8.185],
+    [81.0, 8.235],
+    [81.018, 8.282],
+    [81.058, 8.31],
+    [81.108, 8.312],
+    [81.15, 8.285],
+    [81.172, 8.24],
+    [81.168, 8.19],
+    [81.14, 8.148],
+    [81.1, 8.118],
+    [81.055, 8.105]
+  ],
+  settlements: [
+    { settlementId: 'S1', name: 'Kiri Veedi', position: [80.958, 8.156] },
+    { settlementId: 'S2', name: 'Gokarella Junction', position: [80.94, 8.236] },
+    { settlementId: 'S3', name: 'Uttimula Junction', position: [81.186, 8.222] }
+  ]
+};
+
+const GEOFENCES = [
   {
     zoneId: 'Z1',
     name: 'Elephant Corridor - Western Farmland',
     gridRef: 'G7',
-    threatLevel: THREAT_LEVEL.CRITICAL,
     kind: 'farmland',
+    threatLevel: THREAT_LEVEL.CRITICAL,
     settlementIds: ['S1', 'S2'],
     polygon: [
       [81.03, 8.196],
@@ -46,8 +58,8 @@ export const HIGH_RISK_ZONES = [
     zoneId: 'Z2',
     name: 'Village Edge - Kiri Veedi',
     gridRef: 'F9',
-    threatLevel: THREAT_LEVEL.HIGH,
     kind: 'village',
+    threatLevel: THREAT_LEVEL.HIGH,
     settlementIds: ['S1'],
     polygon: [
       [81.02, 8.108],
@@ -64,8 +76,8 @@ export const HIGH_RISK_ZONES = [
     zoneId: 'Z3',
     name: 'A2 Highway Crossing Corridor',
     gridRef: 'H11',
-    threatLevel: THREAT_LEVEL.HIGH,
     kind: 'road',
+    threatLevel: THREAT_LEVEL.HIGH,
     settlementIds: ['S3'],
     polygon: [
       [81.176, 8.196],
@@ -81,8 +93,8 @@ export const HIGH_RISK_ZONES = [
     zoneId: 'Z4',
     name: 'Resettlement Plot Boundary',
     gridRef: 'D5',
-    threatLevel: THREAT_LEVEL.MEDIUM,
     kind: 'farmland',
+    threatLevel: THREAT_LEVEL.MEDIUM,
     settlementIds: [],
     polygon: [
       [81.06, 8.062],
@@ -97,18 +109,7 @@ export const HIGH_RISK_ZONES = [
   }
 ];
 
-/** Human settlements used to escalate threat level and rank the queue. */
-export const SETTLEMENTS = [
-  { settlementId: 'S1', name: 'Kiri Veedi', position: [80.958, 8.156] },
-  { settlementId: 'S2', name: 'Gokarella Junction', position: [80.94, 8.236] },
-  { settlementId: 'S3', name: 'Uttimula Junction', position: [81.186, 8.222] }
-];
-
-/**
- * Tracked assets. E-402 is the breach subject from the storyboard and the
- * high-fidelity wireframe (Elephant, Grid Ref G7, 14:38 GMT).
- */
-export const COLLARS = [
+const COLLARS = [
   {
     collarId: 'E-402',
     gpsDeviceId: 'GPS-8841',
@@ -116,9 +117,9 @@ export const COLLARS = [
     sex: 'Female',
     health: 'Stable',
     speciesRisk: 'high',
-    status: 'active',
+    status: COLLAR_STATUS.ACTIVE,
     batteryLevel: 78,
-    position: [81.0, 8.243]
+    lastKnownLocation: { type: 'Point', coordinates: [81.06, 8.24] }
   },
   {
     collarId: 'E-118',
@@ -127,9 +128,9 @@ export const COLLARS = [
     sex: 'Male',
     health: 'Stable',
     speciesRisk: 'high',
-    status: 'active',
+    status: COLLAR_STATUS.ACTIVE,
     batteryLevel: 91,
-    position: [81.096, 8.268]
+    lastKnownLocation: { type: 'Point', coordinates: [81.096, 8.268] }
   },
   {
     collarId: 'E-207',
@@ -138,9 +139,9 @@ export const COLLARS = [
     sex: 'Female',
     health: 'Under observation',
     speciesRisk: 'high',
-    status: 'active',
+    status: COLLAR_STATUS.ACTIVE,
     batteryLevel: 64,
-    position: [81.135, 8.226]
+    lastKnownLocation: { type: 'Point', coordinates: [81.135, 8.226] }
   },
   {
     collarId: 'E-331',
@@ -149,9 +150,9 @@ export const COLLARS = [
     sex: 'Male',
     health: 'Stable',
     speciesRisk: 'high',
-    status: 'delayed',
+    status: COLLAR_STATUS.DELAYED,
     batteryLevel: 55,
-    position: [81.086, 8.101]
+    lastKnownLocation: { type: 'Point', coordinates: [81.09, 8.2] }
   },
   {
     collarId: 'E-455',
@@ -160,9 +161,9 @@ export const COLLARS = [
     sex: 'Male',
     health: 'Stable',
     speciesRisk: 'medium',
-    status: 'active',
+    status: COLLAR_STATUS.ACTIVE,
     batteryLevel: 88,
-    position: [81.072, 8.19]
+    lastKnownLocation: { type: 'Point', coordinates: [81.072, 8.19] }
   },
   {
     collarId: 'E-512',
@@ -171,25 +172,16 @@ export const COLLARS = [
     sex: 'Female',
     health: 'Unknown',
     speciesRisk: 'high',
-    status: 'signal_lost',
+    status: COLLAR_STATUS.ACTIVE,
     batteryLevel: 12,
-    position: [81.15, 8.278]
+    lastKnownLocation: { type: 'Point', coordinates: [81.15, 8.278] }
   }
 ];
 
-/** Ranger teams available for dispatch (GeofenceEngine.findNearestRanger). */
-export const RANGERS = [
-  { rangerId: 'RT-01', name: 'Ranger Team Kandy', status: 'available', position: [81.021, 8.191] },
-  { rangerId: 'RT-02', name: 'Ranger Team Matale', status: 'available', position: [81.083, 8.243] },
-  { rangerId: 'RT-03', name: 'Ranger Team Kurunegala', status: 'on_patrol', position: [80.985, 8.212] }
+const RANGER_TEAMS = [
+  { rangerId: 'RT-01', name: 'Ranger Team Kandy', status: RANGER_STATUS.AVAILABLE, position: [81.021, 8.191] },
+  { rangerId: 'RT-02', name: 'Ranger Team Matale', status: RANGER_STATUS.AVAILABLE, position: [81.083, 8.243] },
+  { rangerId: 'RT-03', name: 'Ranger Team Kurunegala', status: RANGER_STATUS.ON_PATROL, position: [80.985, 8.212] }
 ];
 
-export const OFFICER = {
-  officerId: 'OF-021',
-  name: 'Operations Officer',
-  role: 'officer'
-};
-
-/** Reference incident description reused by generated alerts. */
-export const BREACH_DETAIL_TEMPLATE =
-  'Asset {collarId} crossed the designated {zoneKind} boundary into a non-protected zone. Immediate action required.';
+module.exports = { PARK, GEOFENCES, COLLARS, RANGER_TEAMS };

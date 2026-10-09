@@ -1,23 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from '../../../../components/ui/Modal.jsx';
 import Button from '../../../../components/ui/Button.jsx';
-import { findNearestRanger } from '../../domain/geofenceEngine.js';
+import { getNearestRanger } from '../../../../services/api.js';
 
 /**
- * Confirms the ranger dispatch before the notification is sent, so the
- * officer can see which team is closest and override the suggestion.
+ * Confirms the ranger dispatch before the notification is sent. The suggested
+ * team comes from the server's GeofenceEngine.findNearestRanger, so the
+ * browser never recomputes proximity and cannot disagree with what dispatch
+ * will actually do.
  */
 export default function DispatchDialog({ open, alert, rangerTeams, busy, onCancel, onConfirm }) {
+  const [suggested, setSuggested] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
-  const suggested = useMemo(
-    () => (alert ? findNearestRanger(alert.position, rangerTeams) : null),
-    [alert, rangerTeams]
-  );
-
   useEffect(() => {
-    if (open) setSelectedId(suggested?.rangerId ?? null);
-  }, [open, suggested]);
+    if (!open || !alert) return undefined;
+
+    let cancelled = false;
+    setSelectedId(null);
+    setSuggested(null);
+
+    getNearestRanger(alert.position)
+      .then((nearest) => {
+        if (cancelled || !nearest) return;
+        setSuggested(nearest);
+        setSelectedId(nearest.rangerId);
+      })
+      .catch(() => {
+        // Fall back to letting the officer pick manually.
+      });
+
+    return () => { cancelled = true; };
+  }, [open, alert]);
 
   const teams = rangerTeams.filter((team) => team.status === 'available');
 

@@ -1,16 +1,5 @@
 import Badge from '../../../../components/ui/Badge.jsx';
-
-const STATUS_TONE = {
-  active: 'low',
-  delayed: 'medium',
-  signal_lost: 'high'
-};
-
-const STATUS_LABEL = {
-  active: 'Transmitting',
-  delayed: 'Delayed batch',
-  signal_lost: 'Signal lost'
-};
+import { COLLAR_STATUS_LABEL, COLLAR_STATUS_TONE } from '../../domain/labels.js';
 
 /**
  * Tracked collar registry — the WildlifeCollar entities from the class
@@ -43,8 +32,8 @@ export default function CollarRegistryPanel({ collars, onFocusCollar }) {
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-stone-900">{collar.collarId}</span>
-                <Badge tone={STATUS_TONE[collar.status]} size="sm">
-                  {STATUS_LABEL[collar.status]}
+                <Badge tone={COLLAR_STATUS_TONE[collar.status]} size="sm">
+                  {COLLAR_STATUS_LABEL[collar.status] ?? collar.status}
                 </Badge>
               </div>
 
@@ -78,7 +67,8 @@ export default function CollarRegistryPanel({ collars, onFocusCollar }) {
               </dl>
 
               <p className="mt-1.5 font-mono text-[10px] text-stone-400">
-                {collar.position[1].toFixed(4)} N, {collar.position[0].toFixed(4)} E
+                {collar.lastKnownLocation.coordinates[1].toFixed(4)} N,{' '}
+                {collar.lastKnownLocation.coordinates[0].toFixed(4)} E
               </p>
             </button>
           </li>

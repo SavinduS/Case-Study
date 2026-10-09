@@ -1,18 +1,7 @@
 import { useMemo, useState } from 'react';
 import Button from '../../../../components/ui/Button.jsx';
 import Badge from '../../../../components/ui/Badge.jsx';
-import { ALERT_STATUS, AUDIT_TAB } from '../../domain/constants.js';
-
-function formatGmt(value) {
-  return new Date(value).toLocaleString('en-GB', {
-    hour12: false,
-    timeZone: 'GMT',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
+import { ALERT_STATUS, AUDIT_TAB, formatGmtStamp } from '../../domain/labels.js';
 
 /**
  * OperationsDrawer — the review surface for the two record-keeping parts of
@@ -88,7 +77,7 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
                     <Badge tone={alert.status === ALERT_STATUS.DELAYED ? 'medium' : 'low'} size="sm">
                       {alert.status === ALERT_STATUS.DELAYED ? 'Delayed' : 'Patrol check sent'}
                     </Badge>
-                    <span className="ml-auto font-mono text-[11px] text-stone-500">{formatGmt(alert.detectedAt)}</span>
+                    <span className="ml-auto font-mono text-[11px] text-stone-500">{formatGmtStamp(alert.detectedAt)}</span>
                   </div>
                   <p className="mt-1 text-xs text-stone-600">
                     Retroactive breach of {alert.zoneName} ({alert.gridRef}).
@@ -118,7 +107,7 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
               <li key={entry.auditId} className="border-b border-stone-100 px-4 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[11px] font-semibold text-park-800">{entry.action}</span>
-                  <span className="ml-auto font-mono text-[11px] text-stone-500">{formatGmt(entry.at)}</span>
+                  <span className="ml-auto font-mono text-[11px] text-stone-500">{formatGmtStamp(entry.at)}</span>
                 </div>
                 <p className="mt-0.5 text-xs text-stone-600">{entry.detail}</p>
                 <p className="mt-0.5 text-[11px] text-stone-400">

@@ -1,32 +1,11 @@
 import Badge from '../../../../components/ui/Badge.jsx';
-import { ALERT_STATUS, THREAT_LEVEL } from '../../domain/constants.js';
-
-const STATUS_LABEL = {
-  [ALERT_STATUS.ACTIVE]: 'Active',
-  [ALERT_STATUS.ACKNOWLEDGED]: 'Acknowledged',
-  [ALERT_STATUS.RESOLVED]: 'Resolved',
-  [ALERT_STATUS.DISMISSED]: 'False alarm',
-  [ALERT_STATUS.DELAYED]: 'Delayed incident'
-};
-
-const STATUS_TONE = {
-  [ALERT_STATUS.ACTIVE]: 'high',
-  [ALERT_STATUS.ACKNOWLEDGED]: 'medium',
-  [ALERT_STATUS.RESOLVED]: 'low',
-  [ALERT_STATUS.DISMISSED]: 'neutral',
-  [ALERT_STATUS.DELAYED]: 'medium'
-};
-
-const THREAT_TONE = {
-  [THREAT_LEVEL.CRITICAL]: 'high',
-  [THREAT_LEVEL.HIGH]: 'high',
-  [THREAT_LEVEL.MEDIUM]: 'medium',
-  [THREAT_LEVEL.LOW]: 'low'
-};
-
-function formatGmt(value) {
-  return new Date(value).toLocaleTimeString('en-GB', { hour12: false, timeZone: 'GMT' });
-}
+import {
+  ALERT_STATUS,
+  ALERT_STATUS_LABEL,
+  ALERT_STATUS_TONE,
+  THREAT_TONE,
+  formatGmt
+} from '../../domain/labels.js';
 
 /**
  * ActiveAlertsPanel — the "Active Alerts" section the officer navigates to
@@ -83,8 +62,8 @@ export default function ActiveAlertsPanel({ alerts, openCount, onSelect, selecte
                 </p>
 
                 <div className="mt-2 flex items-center gap-2">
-                  <Badge tone={STATUS_TONE[alert.status]} size="sm">
-                    {STATUS_LABEL[alert.status]}
+                  <Badge tone={ALERT_STATUS_TONE[alert.status]} size="sm">
+                    {ALERT_STATUS_LABEL[alert.status]}
                   </Badge>
                   {alert.dispatchedTo && (
                     <span className="truncate text-[11px] text-stone-500">{alert.dispatchedTo}</span>

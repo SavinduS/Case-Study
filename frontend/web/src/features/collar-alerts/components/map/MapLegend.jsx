@@ -1,4 +1,4 @@
-import { THREAT_LEVEL } from '../../domain/constants.js';
+import { THREAT_LEVEL } from '../../domain/labels.js';
 
 const LEGEND = [
   { key: 'boundary', label: 'Park Boundary', swatch: 'border-2 border-alert-600 bg-transparent' },
@@ -18,7 +18,7 @@ export default function MapLegend({ zones = [] }) {
             {item.label}
           </li>
         ))}
-        {zones.map((zone) => (
+        {zones.filter((zone) => zone.enabled !== false).map((zone) => (
           <li key={zone.zoneId} className="flex items-center gap-2 text-[11px] font-medium text-stone-700">
             <span
               className={`inline-block h-3 w-5 rounded-sm border ${

@@ -1,18 +1,5 @@
 import Badge from '../../../../components/ui/Badge.jsx';
-import { THREAT_LEVEL } from '../../domain/constants.js';
-
-const THREAT_TONE = {
-  [THREAT_LEVEL.CRITICAL]: 'high',
-  [THREAT_LEVEL.HIGH]: 'high',
-  [THREAT_LEVEL.MEDIUM]: 'medium',
-  [THREAT_LEVEL.LOW]: 'low'
-};
-
-const KIND_LABEL = {
-  farmland: 'Farmland',
-  village: 'Village edge',
-  road: 'Road crossing'
-};
+import { THREAT_LEVEL, THREAT_TONE, ZONE_KIND_SHORT } from '../../domain/labels.js';
 
 /**
  * Geofence register — the pre-configured high-risk zones that are a
@@ -58,7 +45,7 @@ export default function GeofencePanel({ zones, openAlertCounts, visibleZoneIds, 
               </div>
 
               <p className="mt-1 text-sm font-semibold text-stone-900">{zone.name}</p>
-              <p className="text-xs text-stone-600">{KIND_LABEL[zone.kind] ?? 'High-risk zone'}</p>
+              <p className="text-xs text-stone-600">{ZONE_KIND_SHORT[zone.kind] ?? 'High-risk zone'}</p>
 
               <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-stone-700">
                 <input

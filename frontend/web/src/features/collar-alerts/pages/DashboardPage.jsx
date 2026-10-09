@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Sidebar from '../../../layout/Sidebar.jsx';
 import DashboardMap from '../components/map/DashboardMap.jsx';
 import CriticalAlertModal from '../components/alerts/CriticalAlertModal.jsx';
@@ -53,100 +53,83 @@ const MODULE_OWNERS = {
 /**
  * DashboardPage — "Manage Wildlife Collar Boundary Alerts".
  *
- * Composes the live park map, the Active Alerts queue, the critical alert
- * modal and the operations records drawer around useCollarAlerts. The
- * module rail opens the panels this use case owns (collars, alerts,
- * geofences) and shows an explicit placeholder for everyone else's.
+ * The map, panels and modal read everything from useCollarAlerts, which
+ * polls the API. Nothing on this page decides that a breach occurred: the
+ * server detects breaches, scores them and orders the queue.
  */
 export default function DashboardPage() {
   const alerts = useCollarAlerts();
   const mapRef = useRef(null);
   const [activeModule, setActiveModule] = useState('alerts');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [visibleZoneIds, setVisibleZoneIds] = useState(() => alerts.zones.map((zone) => zone.zoneId));
 
   const {
+    loading,
+    error,
+    park,
     collars,
     zones,
-    rangerTeams,
     settlements,
+    rangerTeams,
     openAlerts,
-    alertsByPriority,
+    openAlertCounts,
     activeAlert,
     auditTrail,
+    delayedAlerts,
     lostCollars,
     sessionExpired,
-    toast
+    toast,
+    visibleZoneIds
   } = alerts;
 
-  const delayedAlerts = useMemo(
-    () => alerts.alerts.filter((alert) => alert.delayed),
-    [alerts.alerts]
-  );
+  const activeZone = zones.find((zone) => zone.zoneId === activeAlert?.zoneId) ?? null;
+  const placeholder = activeModule ? MODULE_OWNERS[activeModule] : null;
 
-  const activeZone = useMemo(
-    () => zones.find((zone) => zone.zoneId === activeAlert?.zoneId) ?? null,
-    [zones, activeAlert]
-  );
-
-  const visibleZones = useMemo(
-    () => zones.filter((zone) => visibleZoneIds.includes(zone.zoneId)),
-    [zones, visibleZoneIds]
-  );
-
-  const openAlertCounts = useMemo(() => {
-    const counts = {};
-    for (const alert of openAlerts) {
-      counts[alert.zoneId] = (counts[alert.zoneId] ?? 0) + 1;
-    }
-    return counts;
-  }, [openAlerts]);
-
-  const toggleZone = useCallback((zoneId) => {
-    setVisibleZoneIds((current) =>
-      current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]
-    );
-  }, []);
-
-  const toggleAllZones = useCallback(() => {
-    setVisibleZoneIds((current) => (current.length === zones.length ? [] : zones.map((z) => z.zoneId)));
-  }, [zones]);
-
-  const onSelectCollar = useCallback(
+  /** Clicking a collar marker opens its alert, or just pans to it. */
+  const selectAlertByCollar = useCallback(
     (collarId) => {
-      const match = alertsByPriority.find((alert) => alert.collarId === collarId);
+      const match = alerts.alerts.find((alert) => alert.collarId === collarId);
       if (match) {
         alerts.selectAlert(match.alertId);
         return;
       }
       const collar = collars.find((item) => item.collarId === collarId);
-      if (collar) mapRef.current?.locateCollar?.(collar.position);
+      if (collar) mapRef.current?.locateCollar?.(collar.lastKnownLocation.coordinates);
     },
-    [alertsByPriority, collars, alerts]
+    [alerts, collars]
   );
 
-  const focusCollar = useCallback(
+  /** From the collar registry: centre the map and raise the alert if there is one. */
+  const locateCollar = useCallback(
     (collar) => {
-      mapRef.current?.locateCollar?.(collar.position);
-      const match = alertsByPriority.find((alert) => alert.collarId === collar.collarId);
+      mapRef.current?.locateCollar?.(collar.lastKnownLocation.coordinates);
+      const match = alerts.alerts.find((alert) => alert.collarId === collar.collarId);
       if (match) alerts.selectAlert(match.alertId);
     },
-    [alertsByPriority, alerts]
+    [alerts]
   );
 
-  const placeholder = activeModule ? MODULE_OWNERS[activeModule] : null;
+  if (loading) {
+    return (
+      <div className="grid h-full place-items-center bg-sand-100">
+        <p className="text-sm font-semibold text-stone-500">Loading operations data…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-park-900">
+      {error && <ApiErrorBanner message={error} onRetry={alerts.refresh} />}
+
       <DashboardMap
         ref={mapRef}
+        park={park}
         collars={collars}
-        zones={visibleZones}
-        totalZoneCount={zones.length}
+        zones={zones}
         rangerTeams={rangerTeams}
         settlements={settlements}
         openAlerts={openAlerts}
-        onSelectCollar={onSelectCollar}
+        onSelectCollar={selectAlertByCollar}
       />
 
       <Sidebar activeKey={activeModule} onSelect={setActiveModule} />
@@ -159,28 +142,31 @@ export default function DashboardPage() {
         <>
           {activeModule === 'alerts' && (
             <ActiveAlertsPanel
-              alerts={alertsByPriority}
+              alerts={alerts.alerts}
               openCount={openAlerts.length}
               selectedAlertId={activeAlert?.alertId}
               onSelect={alerts.selectAlert}
             />
           )}
           {activeModule === 'collars' && (
-            <CollarRegistryPanel collars={collars} onFocusCollar={focusCollar} />
+            <CollarRegistryPanel collars={collars} onFocusCollar={locateCollar} />
           )}
           {activeModule === 'geofences' && (
             <GeofencePanel
               zones={zones}
               openAlertCounts={openAlertCounts}
               visibleZoneIds={visibleZoneIds}
-              onToggleZone={toggleZone}
-              onToggleAll={toggleAllZones}
+              onToggleZone={(zoneId) => {
+                const zone = zones.find((z) => z.zoneId === zoneId);
+                alerts.setZoneEnabled(zoneId, zone?.enabled === false);
+              }}
+              onToggleAll={alerts.toggleAllZones}
             />
           )}
         </>
       )}
 
-      <SignalLostBanner collarIds={lostCollars} onDismiss={alerts.clearSignalLost} />
+      <SignalLostBanner collarIds={lostCollars} onDismiss={alerts.dismissSignalLost} />
 
       <OperationsDrawer
         open={drawerOpen}
@@ -195,8 +181,9 @@ export default function DashboardPage() {
 
       <DemoControls
         onOpenRecords={() => setDrawerOpen((value) => !value)}
-        onSimulateSignalLoss={() => alerts.simulateSignalLost()}
+        onSimulateSignalLost={() => alerts.simulateSignalLost()}
         onForceSessionExpiry={() => alerts.setSessionExpired(true)}
+        onRefresh={alerts.refresh}
       />
 
       <CriticalAlertModal
@@ -215,13 +202,38 @@ export default function DashboardPage() {
   );
 }
 
+/** Shows a backend/API failure rather than leaving a blank map. */
+function ApiErrorBanner({ message, onRetry }) {
+  return (
+    <div
+      role="alert"
+      className="absolute left-1/2 top-4 z-[1600] -translate-x-1/2 rounded-md border border-alert-600/40 bg-alert-100 px-4 py-2.5 shadow-lg"
+    >
+      <div className="flex items-center gap-3">
+        <div>
+          <p className="text-sm font-bold text-alert-600">Cannot reach the API</p>
+          <p className="text-xs text-stone-700">{message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded border border-stone-400 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-white/60"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Small strip of controls used to demonstrate the exception flows. */
-function DemoControls({ onOpenRecords, onSimulateSignalLoss, onForceSessionExpiry }) {
+function DemoControls({ onOpenRecords, onSimulateSignalLoss, onForceSessionExpiry, onRefresh }) {
   return (
     <div className="absolute left-16 top-1/2 z-[700] -translate-y-1/2 rounded-md bg-white/95 p-2 shadow-lg">
       <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-stone-500">Flows</p>
       <div className="flex flex-col gap-1">
         <DemoButton label="Records" onClick={onOpenRecords} />
+        <DemoButton label="Refresh" onClick={onRefresh} />
         <DemoButton label="Signal lost" onClick={onSimulateSignalLoss} />
         <DemoButton label="Session timeout" onClick={onForceSessionExpiry} />
       </div>

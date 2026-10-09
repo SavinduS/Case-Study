@@ -5,27 +5,7 @@ import Badge from '../../../../components/ui/Badge.jsx';
 import AlertMiniMap from './AlertMiniMap.jsx';
 import FalseAlarmDialog from './FalseAlarmDialog.jsx';
 import DispatchDialog from './DispatchDialog.jsx';
-import { ALERT_STATUS, THREAT_LEVEL } from '../../domain/constants.js';
-
-const ZONE_KIND_LABEL = {
-  farmland: 'Poaching Risk Zone',
-  village: 'Village Conflict Zone',
-  road: 'Road Crossing Hazard'
-};
-
-const THREAT_TONE = {
-  [THREAT_LEVEL.CRITICAL]: 'high',
-  [THREAT_LEVEL.HIGH]: 'high',
-  [THREAT_LEVEL.MEDIUM]: 'medium',
-  [THREAT_LEVEL.LOW]: 'low'
-};
-
-function formatGmt(value) {
-  return `${new Date(value).toLocaleTimeString('en-GB', {
-    hour12: false,
-    timeZone: 'GMT'
-  })} GMT`;
-}
+import { ALERT_STATUS, THREAT_LEVEL, THREAT_TONE, ZONE_KIND_LABEL, formatGmt } from '../../domain/labels.js';
 
 /**
  * CriticalAlertModal — the instant visual + acoustic alert raised when the

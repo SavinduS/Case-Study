@@ -1,442 +1,263 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import MockTelemetryGateway from '../services/telemetryService.js';
-import NotificationService from '../services/dispatchService.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as api from '../../../services/api.js';
 import {
-  evaluateGeofence,
-  deriveSeverity,
-  findNearestRanger,
-  prioritiseAlerts,
-  shouldRaiseAlert,
-  distanceToNearestSettlementM
-} from '../domain/geofenceEngine.js';
-import {
-  createBoundaryAlert,
-  createAuditEntry,
-  AUDIT_ACTION
-} from '../domain/alertFactory.js';
-import { ALERT_STATUS } from '../domain/constants.js';
-import { COLLARS, HIGH_RISK_ZONES, RANGERS, SETTLEMENTS, OFFICER } from '../data/parkData.js';
+  ALERT_STATUS,
+  COLLAR_STATUS,
+  DISPATCH_STATE,
+  OPEN_STATUSES,
+  isOpen
+} from '../domain/labels.js';
 
-/** Distance (m) outside a zone that still counts as "approaching". */
-const APPROACH_BUFFER_M = 400;
-
-const initialState = {
-  collars: COLLARS,
-  alerts: [],
-  auditTrail: [],
-  activeAlertId: null,
-  lostCollars: [],
-  sessionExpired: false,
-  toast: null
-};
+const POLL_INTERVAL_MS = 3000;
 
 /**
- * Single reducer for the use case so every status change produces an
- * audit trail entry (main flow step 12).
- */
-function reducer(state, action) {
-  switch (action.type) {
-    case 'fix':
-      return { ...state, collars: upsertCollar(state.collars, action.collar) };
-
-    case 'alert_raised':
-      return {
-        ...state,
-        alerts: [action.alert, ...state.alerts],
-        activeAlertId: action.alert.alertId,
-        auditTrail: [action.audit, ...state.auditTrail]
-      };
-
-    case 'alert_updated':
-      return {
-        ...state,
-        alerts: state.alerts.map((alert) =>
-          alert.alertId === action.alertId ? { ...alert, ...action.patch } : alert
-        ),
-        auditTrail: action.audit ? [action.audit, ...state.auditTrail] : state.auditTrail
-      };
-
-    case 'select_alert':
-      return { ...state, activeAlertId: action.alertId };
-
-    case 'dismiss_active':
-      return { ...state, activeAlertId: null };
-
-    case 'signal_lost':
-      return {
-        ...state,
-        collars: state.collars.map((collar) =>
-          collar.collarId === action.collarId ? { ...collar, status: 'signal_lost' } : collar
-        ),
-        lostCollars: state.lostCollars.includes(action.collarId)
-          ? state.lostCollars
-          : [...state.lostCollars, action.collarId],
-        auditTrail: [action.audit, ...state.auditTrail]
-      };
-
-    case 'signal_lost_clear':
-      return { ...state, lostCollars: [] };
-
-    case 'toast':
-      return { ...state, toast: action.toast };
-
-    case 'session_expired':
-      return { ...state, sessionExpired: action.value };
-
-    default:
-      return state;
-  }
-}
-
-function upsertCollar(collars, next) {
-  const index = collars.findIndex((collar) => collar.collarId === next.collarId);
-  if (index === -1) return [...collars, next];
-  const updated = [...collars];
-  updated[index] = { ...updated[index], ...next };
-  return updated;
-}
-
-/** Replaces a collar's live position with one recorded in the past. */
-function collarAt(collar, position) {
-  return { ...collar, position };
-}
-
-/**
- * useCollarAlerts — controller for "Manage Wildlife Collar Boundary Alerts".
+ * useCollarAlerts - view model for "Manage Wildlife Collar Boundary Alerts".
  *
- * Owns the live telemetry subscription, geofence evaluation, the Active
- * Alerts queue and the audit trail. The backend will replace
- * MockTelemetryGateway / NotificationService with HTTP calls; the reducer
- * and the domain layer stay unchanged.
+ * All breach detection, severity scoring, queue ordering and persistence
+ * happen on the server; this hook only fetches what the database holds and
+ * sends officer responses back. It polls because the telemetry gateway posts
+ * asynchronously, so the dashboard is never the source of a state change.
  */
-export default function useCollarAlerts({
-  autoStart = true,
-  intervalMs = 3000,
-  dispatchAlwaysFails = false
-} = {}) {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const stateRef = useRef(state);
-  stateRef.current = state;
+export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = {}) {
+  const [park, setPark] = useState(null);
+  const [collars, setCollars] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [rangerTeams, setRangerTeams] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [delayedAlerts, setDelayedAlerts] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [activeAlertId, setActiveAlertId] = useState(null);
+  const [visibleZoneIds, setVisibleZoneIds] = useState(null);
+
+  // Guards against a slow response from a previous poll overwriting a newer one.
+  const requestIdRef = useRef(0);
 
   /**
-   * Mirrors state.alerts but is also updated synchronously the moment an
-   * alert is raised. A delayed batch replay raises several alerts inside a
-   * single tick, before React re-renders, so the reducer state alone would
-   * still look empty and the dedupe check would pass them all through.
+   * Alert IDs that have already been announced. Main flow step 4 requires the
+   * dashboard to raise an instant critical alert the moment the server
+   * detects a breach, so each newly appeared alert is announced exactly once.
    */
-  const alertsRef = useRef(state.alerts);
-  useEffect(() => {
-    alertsRef.current = state.alerts;
-  }, [state.alerts]);
+  const announcedRef = useRef(new Set());
 
-  const gatewayRef = useRef(null);
-  const notifierRef = useRef(null);
+  const load = useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
-  if (!gatewayRef.current) gatewayRef.current = new MockTelemetryGateway(COLLARS, { intervalMs });
-  if (!notifierRef.current) notifierRef.current = new NotificationService({ shouldFail: () => dispatchAlwaysFails });
+    try {
+      const [nextPark, nextCollars, nextZones, nextTeams, nextAlerts, nextAudit] = await Promise.all([
+        api.getPark(),
+        api.getCollars(),
+        api.getGeofences(),
+        api.getRangerTeams(),
+        api.getAlerts(),
+        api.getAuditTrail(60)
+      ]);
 
-  const evaluateFix = useCallback((collar, at, { delayed = false } = {}) => {
-    const { result } = evaluateGeofence(collar.position, HIGH_RISK_ZONES, {
-      bufferM: APPROACH_BUFFER_M
-    });
-    if (!result) return null;
+      if (requestId !== requestIdRef.current) return;
 
-    // A collar inside a zone keeps transmitting; raise one alert per episode.
-    if (!shouldRaiseAlert(alertsRef.current, { collarId: collar.collarId, zoneId: result.zoneId })) {
-      return null;
-    }
+      setPark(nextPark);
+      setCollars(nextCollars);
+      setZones(nextZones);
+      setRangerTeams(nextTeams);
+      setAlerts(nextAlerts);
+      setAuditTrail(nextAudit);
+      setError(null);
+      setDelayedAlerts(nextAlerts.filter((alert) => alert.delayed));
 
-    const distanceToSettlementM = distanceToNearestSettlementM(collar.position, SETTLEMENTS);
-    const severity = deriveSeverity(result, { distanceToSettlementM });
-    const alert = createBoundaryAlert({
-      collar,
-      result,
-      detectedAt: at,
-      severity,
-      delayed
-    });
-    alert.severity = severity;
-    alertsRef.current = [alert, ...alertsRef.current];
+      setVisibleZoneIds((current) => current ?? nextZones.map((zone) => zone.zoneId));
 
-    const audit = createAuditEntry({
-      action: delayed ? AUDIT_ACTION.DELAYED_INCIDENT_FLAGGED : AUDIT_ACTION.ALERT_RAISED,
-      alert,
-      actor: delayed ? 'GeofenceEngine' : 'GeofenceEngine',
-      detail: delayed
-        ? `Retroactive breach reconstructed from batch upload in ${result.zoneName}.`
-        : `${collar.collarId} entered ${result.zoneName} (${result.gridRef}).`,
-      at
-    });
-
-    dispatch({ type: 'alert_raised', alert, audit });
-    return alert;
-  }, []);
-
-  const handleEvent = useCallback(
-    (event) => {
-      switch (event.type) {
-        case 'fix': {
-          dispatch({ type: 'fix', collar: event.collar });
-          evaluateFix(event.collar, event.at);
-          break;
-        }
-        case 'signal_lost': {
-          const alert = createAuditEntry({
-            action: AUDIT_ACTION.SIGNAL_LOST,
-            alert: null,
-            actor: 'CollarGateway',
-            detail: `Telemetry link lost for ${event.collarId}: ${event.reason}.`,
-            at: event.at
-          });
-          dispatch({ type: 'signal_lost', collarId: event.collarId, audit: alert });
-          break;
-        }
-        case 'signal_restored': {
-          // Alternate flow D: replay historical fixes as delayed incidents.
-          const collar = stateRef.current.collars.find((c) => c.collarId === event.collarId);
-          if (!collar) break;
-          event.batch.forEach((fix) => {
-            dispatch({ type: 'fix', collar: collarAt(collar, fix.position) });
-            evaluateFix(collarAt(collar, fix.position), new Date(fix.recordedAt), { delayed: true });
-          });
-          break;
-        }
-        default:
-          break;
+      // Announce the highest priority alert that has not been seen yet. The
+      // server already returns the queue ordered by priority, so the first
+      // unseen entry is the one the officer must handle first.
+      const unseen = nextAlerts.filter((alert) => !announcedRef.current.has(alert.alertId));
+      if (unseen.length > 0) {
+        nextAlerts.forEach((alert) => announcedRef.current.add(alert.alertId));
+        setActiveAlertId(unseen[0].alertId);
       }
-    },
-    [evaluateFix]
-  );
-
-  useEffect(() => {
-    const gateway = gatewayRef.current;
-    const unsubscribe = gateway.subscribe(handleEvent);
-    if (autoStart) gateway.start();
-    return () => {
-      unsubscribe();
-      gateway.stop();
-    };
-  }, [autoStart, handleEvent]);
-
-  const alertsByPriority = useMemo(() => prioritiseAlerts(state.alerts), [state.alerts]);
-  const openAlerts = useMemo(
-    () =>
-      alertsByPriority.filter((alert) =>
-        [ALERT_STATUS.ACTIVE, ALERT_STATUS.ACKNOWLEDGED, ALERT_STATUS.DELAYED].includes(alert.status)
-      ),
-    [alertsByPriority]
-  );
-  const activeAlert = useMemo(
-    () => state.alerts.find((alert) => alert.alertId === state.activeAlertId) ?? null,
-    [state.alerts, state.activeAlertId]
-  );
-
-  const patchAlert = useCallback((alertId, patch, audit) => {
-    dispatch({ type: 'alert_updated', alertId, patch, audit });
+    } catch (caught) {
+      if (requestId !== requestIdRef.current) return;
+      setError(caught.message);
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
   }, []);
 
-  const selectAlert = useCallback((alertId) => dispatch({ type: 'select_alert', alertId }), []);
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, pollIntervalMs);
+    return () => clearInterval(timer);
+  }, [load, pollIntervalMs]);
 
-  const closeAlert = useCallback(() => dispatch({ type: 'dismiss_active' }), []);
+  const openAlerts = useMemo(() => alerts.filter(isOpen), [alerts]);
 
-  /** Main flow steps 8-12: acknowledge and dispatch the nearest ranger. */
-  const acknowledgeAndDispatch = useCallback(
-    async (alertId) => {
-      const alert = stateRef.current.alerts.find((item) => item.alertId === alertId);
-      if (!alert) return null;
+  const activeAlert = useMemo(
+    () => alerts.find((alert) => alert.alertId === activeAlertId) ?? null,
+    [alerts, activeAlertId]
+  );
 
-      const ranger = findNearestRanger(alert.position, RANGERS);
-      patchAlert(
-        alertId,
-        { status: ALERT_STATUS.ACKNOWLEDGED, handledBy: OFFICER.officerId, handledAt: new Date(), dispatchState: 'sending' },
-        createAuditEntry({
-          action: AUDIT_ACTION.ALERT_ACKNOWLEDGED,
-          alert,
-          actor: OFFICER.officerId,
-          detail: `Alert ${alert.alertId} acknowledged by ${OFFICER.name}.`,
-        })
-      );
+  const lostCollars = useMemo(
+    () => collars.filter((collar) => collar.status === COLLAR_STATUS.SIGNAL_LOST).map((c) => c.collarId),
+    [collars]
+  );
 
-      const outcome = await notifierRef.current.sendDispatch(alert, ranger);
-      const current = stateRef.current.alerts.find((item) => item.alertId === alertId);
+  const settlements = useMemo(() => park?.settlements ?? [], [park]);
 
-      if (outcome.delivered) {
-        patchAlert(
-          alertId,
-          { dispatchState: 'delivered', dispatchedTo: ranger?.name ?? null, dispatchAttempts: outcome.attempts },
-          createAuditEntry({
-            action: AUDIT_ACTION.RANGER_DISPATCHED,
-            alert: current ?? alert,
-            actor: 'NotificationService',
-            detail: `${ranger?.name ?? 'Nearest ranger team'} dispatched after ${outcome.attempts} attempt(s).`,
-          })
-        );
-        dispatch({
-          type: 'toast',
-          toast: { kind: 'success', title: 'Addressed', body: 'Response Team Dispatched', alertId }
-        });
-      } else {
-        patchAlert(
-          alertId,
-          { dispatchState: 'failed', dispatchAttempts: outcome.attempts },
-          createAuditEntry({
-            action: AUDIT_ACTION.DISPATCH_FAILED,
-            alert: current ?? alert,
-            actor: 'NotificationService',
-            detail: `Dispatch failed after ${outcome.attempts} retries. Use radio.`,
-          })
-        );
-        dispatch({
-          type: 'toast',
-          toast: {
+  const openAlertCounts = useMemo(() => {
+    const counts = {};
+    for (const alert of openAlerts) counts[alert.zoneId] = (counts[alert.zoneId] ?? 0) + 1;
+    return counts;
+  }, [openAlerts]);
+
+  const selectAlert = useCallback((alertId) => setActiveAlertId(alertId), []);
+  const closeAlert = useCallback(() => setActiveAlertId(null), []);
+
+  /** Shared path for the four officer responses. */
+  const respond = useCallback(
+    async (alertId, action, options = {}) => {
+      try {
+        const result = await api.respondToAlert(alertId, action, options);
+        await load();
+
+        if (result.dispatch?.delivered === false) {
+          setToast({
             kind: 'error',
             title: 'Dispatch failed',
             body: 'Failed delivery - contact ranger team by radio',
             alertId
-          }
-        });
+          });
+        }
+        return result;
+      } catch (caught) {
+        setToast({ kind: 'error', title: 'Action failed', body: caught.message });
+        throw caught;
+      } finally {
+        setActiveAlertId(null);
       }
-
-      dispatch({ type: 'dismiss_active' });
-      return outcome;
     },
-    [patchAlert]
+    [load]
   );
 
-  /** Alternate flow: officer keeps the animal under observation. */
+  const acknowledgeAndDispatch = useCallback(
+    (alertId) => respond(alertId, 'acknowledge_dispatch').then((result) => {
+      setToast({ kind: 'success', title: 'Addressed', body: 'Response Team Dispatched', alertId });
+      return result;
+    }),
+    [respond]
+  );
+
   const monitorClosely = useCallback(
-    (alertId) => {
-      const alert = stateRef.current.alerts.find((item) => item.alertId === alertId);
-      if (!alert) return;
-      patchAlert(
-        alertId,
-        { status: ALERT_STATUS.ACKNOWLEDGED, handledBy: OFFICER.officerId, handledAt: new Date() },
-        createAuditEntry({
-          action: AUDIT_ACTION.MONITOR_CLOSELY,
-          alert,
-          actor: OFFICER.officerId,
-          detail: 'Officer elected to monitor the animal closely without dispatch.',
-        })
-      );
-      dispatch({ type: 'toast', toast: { kind: 'info', title: 'Monitoring', body: 'Alert kept under observation' } });
-      dispatch({ type: 'dismiss_active' });
-    },
-    [patchAlert]
+    (alertId) => respond(alertId, 'monitor_closely').then(() => {
+      setToast({ kind: 'info', title: 'Monitoring', body: 'Alert kept under observation', alertId });
+    }),
+    [respond]
   );
 
-  /** Alternate flow C: signal-drift false positive, dismissed with notes. */
   const markFalseAlarm = useCallback(
-    (alertId, notes) => {
-      const alert = stateRef.current.alerts.find((item) => item.alertId === alertId);
-      if (!alert) return;
-      patchAlert(
-        alertId,
-        {
-          status: ALERT_STATUS.DISMISSED,
-          handledBy: OFFICER.officerId,
-          handledAt: new Date(),
-          notes: notes || 'Stationary collar signal drift.'
-        },
-        createAuditEntry({
-          action: AUDIT_ACTION.MARKED_FALSE_ALARM,
-          alert,
-          actor: OFFICER.officerId,
-          detail: notes || 'Stationary collar signal drift.',
-        })
-      );
-      dispatch({ type: 'toast', toast: { kind: 'info', title: 'Alert dismissed', body: 'Logged as false alarm' } });
-      dispatch({ type: 'dismiss_active' });
-    },
-    [patchAlert]
+    (alertId, notes) => respond(alertId, 'mark_false_alarm', { notes }).then(() => {
+      setToast({ kind: 'info', title: 'Alert dismissed', body: 'Logged as false alarm', alertId });
+    }),
+    [respond]
   );
 
-  /** Alternate flow D: officer decides a delayed breach needs a patrol check. */
   const decideDelayedPatrolCheck = useCallback(
-    async (alertId) => {
-      const alert = stateRef.current.alerts.find((item) => item.alertId === alertId);
-      if (!alert) return null;
-
-      const ranger = findNearestRanger(alert.position, RANGERS);
-      patchAlert(
-        alertId,
-        { status: ALERT_STATUS.ACKNOWLEDGED, handledBy: OFFICER.officerId, handledAt: new Date(), dispatchState: 'sending' },
-        createAuditEntry({
-          action: AUDIT_ACTION.PATROL_CHECK_DISPATCHED,
-          alert,
-          actor: OFFICER.officerId,
-          detail: 'Delayed incident accepted; retroactive patrol check dispatched.',
-        })
-      );
-
-      const outcome = await notifierRef.current.sendDispatch(alert, ranger);
-      const current = stateRef.current.alerts.find((item) => item.alertId === alertId);
-      patchAlert(
-        alertId,
-        { dispatchState: outcome.delivered ? 'delivered' : 'failed', dispatchedTo: ranger?.name ?? null },
-        createAuditEntry({
-          action: outcome.delivered ? AUDIT_ACTION.RANGER_DISPATCHED : AUDIT_ACTION.DISPATCH_FAILED,
-          alert: current ?? alert,
-          actor: 'NotificationService',
-          detail: outcome.delivered
-            ? `${ranger?.name ?? 'Ranger team'} tasked with delayed patrol check.`
-            : 'Dispatch failed after 3 retries. Use radio.',
-        })
-      );
-      dispatch({
-        type: 'toast',
-        toast: outcome.delivered
-          ? { kind: 'success', title: 'Patrol check', body: 'Response Team Dispatched', alertId }
-          : { kind: 'error', title: 'Dispatch failed', body: 'Failed delivery - contact ranger team by radio', alertId }
-      });
-      return outcome;
-    },
-    [patchAlert]
+    (alertId) => respond(alertId, 'dispatch_patch_check').then(() => {
+      setToast({ kind: 'success', title: 'Patrol check', body: 'Response Team Dispatched', alertId });
+    }),
+    [respond]
   );
 
-  const dismissToast = useCallback(() => dispatch({ type: 'toast', toast: null }), []);
-  const clearSignalLost = useCallback(() => dispatch({ type: 'signal_lost_clear' }), []);
+  const setZoneEnabled = useCallback(
+    async (zoneId, enabled) => {
+      setZones((current) =>
+        current.map((zone) => (zone.zoneId === zoneId ? { ...zone, enabled } : zone))
+      );
+      setVisibleZoneIds((current) => {
+        const ids = current ?? zones.map((zone) => zone.zoneId);
+        return enabled ? [...new Set([...ids, zoneId])] : ids.filter((id) => id !== zoneId);
+      });
+      try {
+        await api.setGeofenceEnabled(zoneId, enabled);
+        await load();
+      } catch (caught) {
+        setError(caught.message);
+        await load();
+      }
+    },
+    [load, zones]
+  );
 
-  /** Forces the gateway fault from exception flow 1 for demo purposes. */
-  const simulateSignalLost = useCallback((collarId = 'E-207') => {
-    dispatch({
-      type: 'signal_lost',
-      collarId,
-      audit: createAuditEntry({
-        action: AUDIT_ACTION.SIGNAL_LOST,
-        alert: null,
-        actor: 'CollarGateway',
-        detail: `Telemetry link lost for ${collarId}: Gateway heartbeat timeout.`,
-        at: new Date()
-      })
-    });
-  }, []);
-  const setSessionExpired = useCallback(
-    (value) => dispatch({ type: 'session_expired', value }),
-    []
+  const toggleAllZones = useCallback(() => {
+    const ids = zones.map((zone) => zone.zoneId);
+    const allVisible = (visibleZoneIds ?? ids).length === ids.length;
+    setVisibleZoneIds(allVisible ? [] : ids);
+  }, [zones, visibleZoneIds]);
+
+  const dismissToast = useCallback(() => setToast(null), []);
+
+  /**
+   * Hides the Signal Lost banner without touching the collar. The collar
+   * stays flagged in the database and in the Collar Registry until the
+   * gateway actually restores the link, so this is presentation only.
+   */
+  const [dismissedCollars, setDismissedCollars] = useState([]);
+  const visibleLostCollars = useMemo(
+    () => lostCollars.filter((collarId) => !dismissedCollars.includes(collarId)),
+    [lostCollars, dismissedCollars]
+  );
+  const dismissSignalLost = useCallback(() => setDismissedCollars(lostCollars), [lostCollars]);
+
+  /** Reports a gateway dropout so the backend flags the collar Signal Lost. */
+  const simulateSignalLost = useCallback(
+    async (collarId = 'E-207') => {
+      try {
+        await api.reportSignalLost(collarId, true, 'Gateway heartbeat timeout');
+        await load();
+      } catch (caught) {
+        setError(caught.message);
+      }
+    },
+    [load]
   );
 
   return {
-    collars: state.collars,
-    alerts: state.alerts,
-    alertsByPriority,
+    loading,
+    error,
+    refresh: load,
+    park,
+    collars,
+    zones,
+    settlements,
+    rangerTeams,
+    alerts,
     openAlerts,
+    openAlertCounts,
     activeAlert,
-    auditTrail: state.auditTrail,
-    lostCollars: state.lostCollars,
-    sessionExpired: state.sessionExpired,
-    toast: state.toast,
-    zones: HIGH_RISK_ZONES,
-    rangerTeams: RANGERS,
-    settlements: SETTLEMENTS,
+    auditTrail,
+    delayedAlerts,
+    lostCollars: visibleLostCollars,
+    sessionExpired,
+    toast,
+    visibleZoneIds: visibleZoneIds ?? zones.map((zone) => zone.zoneId),
     acknowledgeAndDispatch,
     monitorClosely,
     markFalseAlarm,
     decideDelayedPatrolCheck,
     selectAlert,
     closeAlert,
-    dismissToast,
-    clearSignalLost,
+    setZoneEnabled,
+    toggleAllZones,
     simulateSignalLost,
-    setSessionExpired
+    dismissToast,
+    dismissSignalLost,
+    setSessionExpired,
+    // Re-exported so components can read the vocabulary without a second import
+    ALERT_STATUS,
+    DISPATCH_STATE,
+    OPEN_STATUSES
   };
 }
