@@ -9,8 +9,8 @@ import {
   View
 } from 'react-native';
 import { ApiError, getReport, pingServer } from '../api/client';
+import { getActiveBaseUrl } from '../api/baseUrl';
 import { INCIDENT_LABELS } from '../constants/incidentTypes';
-import { API_BASE_URL } from '../config';
 import { listReports } from '../services/offlineQueue';
 import StatusBanner from '../components/StatusBanner';
 import { colors, font, radius, spacing } from '../theme';
@@ -22,6 +22,11 @@ interface Props {
 }
 
 type ServerState = 'checking' | 'up' | 'down';
+
+interface ServerStatus {
+  state: ServerState;
+  base: string;
+}
 
 type LiveState =
   | { state: 'loading' }
@@ -37,7 +42,10 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [server, setServer] = useState<ServerState>('checking');
+  const [server, setServer] = useState<ServerStatus>({
+    state: 'checking',
+    base: getActiveBaseUrl()
+  });
   const [live, setLive] = useState<Record<string, LiveState>>({});
 
   const reload = useCallback(async () => {
@@ -47,8 +55,9 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
   }, []);
 
   const checkServer = useCallback(async () => {
-    setServer('checking');
-    setServer((await pingServer()) ? 'up' : 'down');
+    setServer((s) => ({ ...s, state: 'checking' }));
+    const result = await pingServer();
+    setServer({ state: result.reachable ? 'up' : 'down', base: result.base });
   }, []);
 
   useEffect(() => {
@@ -166,15 +175,15 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
       </View>
 
       <View style={styles.bannerWrap}>
-        {server === 'checking' ? (
+        {server.state === 'checking' ? (
           <StatusBanner tone="offline" title="Checking server connection…" />
-        ) : server === 'up' ? (
-          <StatusBanner tone="success" title="Server reachable" message={API_BASE_URL} />
+        ) : server.state === 'up' ? (
+          <StatusBanner tone="success" title="Server reachable" message={server.base} />
         ) : (
           <StatusBanner
             tone="error"
             title="Server NOT reachable"
-            message={`Cannot reach ${API_BASE_URL}. Check EXPO_PUBLIC_API_BASE_URL in frontend/mobile/.env and allow Node.js through the Windows firewall. Reports stay on this device until the server is reachable.`}
+            message={`Tried ${server.base} (and the Metro host, ports 5000/5001, 10.0.2.2, LAN fallback). Check that the backend is running and the Windows firewall allows Node.js. Reports stay on this device until the server is reachable.`}
           />
         )}
       </View>

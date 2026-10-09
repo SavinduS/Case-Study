@@ -7,6 +7,7 @@ import {
   createReport,
   getReport,
   NetworkError,
+  pingServer,
   uploadPhoto
 } from './src/api/client';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
@@ -114,6 +115,7 @@ export default function App() {
   useEffect(() => {
     detectLocation();
     void flushSavedReports();
+    void pingServer(); // warm up base-URL discovery in the background
     const unsubscribe = NetInfo.addEventListener((state) => {
       const online = state.isConnected !== false && state.isInternetReachable !== false;
       if (online) void flushSavedReports();
