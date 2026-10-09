@@ -32,7 +32,6 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
   const [toast, setToast] = useState(null);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [activeAlertId, setActiveAlertId] = useState(null);
-  const [visibleZoneIds, setVisibleZoneIds] = useState(null);
 
   // Guards against a slow response from a previous poll overwriting a newer one.
   const requestIdRef = useRef(0);
@@ -68,8 +67,6 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
       setAuditTrail(nextAudit);
       setError(null);
       setDelayedAlerts(nextAlerts.filter((alert) => alert.delayed));
-
-      setVisibleZoneIds((current) => current ?? nextZones.map((zone) => zone.zoneId));
 
       // Announce the highest priority alert that has not been seen yet. The
       // server already returns the queue ordered by priority, so the first
@@ -107,6 +104,17 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
 
   const settlements = useMemo(() => park?.settlements ?? [], [park]);
 
+  /**
+   * Zone visibility is the server's `enabled` flag, not local state. Keeping a
+   * local copy let the map drift out of step with the database when a toggle
+   * failed, and a zone that is hidden locally but enabled in the database is
+   * still evaluated for breaches.
+   */
+  const visibleZoneIds = useMemo(
+    () => zones.filter((zone) => zone.enabled !== false).map((zone) => zone.zoneId),
+    [zones]
+  );
+
   const openAlertCounts = useMemo(() => {
     const counts = {};
     for (const alert of openAlerts) counts[alert.zoneId] = (counts[alert.zoneId] ?? 0) + 1;
@@ -116,21 +124,16 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
   const selectAlert = useCallback((alertId) => setActiveAlertId(alertId), []);
   const closeAlert = useCallback(() => setActiveAlertId(null), []);
 
-  /** Shared path for the four officer responses. */
+  /**
+   * Shared path for the four officer responses. Only transport failures raise
+   * a toast here; whether the dispatch itself succeeded is decided by the
+   * caller so a failed delivery is never reported as a success.
+   */
   const respond = useCallback(
     async (alertId, action, options = {}) => {
       try {
         const result = await api.respondToAlert(alertId, action, options);
         await load();
-
-        if (result.dispatch?.delivered === false) {
-          setToast({
-            kind: 'error',
-            title: 'Dispatch failed',
-            body: 'Failed delivery - contact ranger team by radio',
-            alertId
-          });
-        }
         return result;
       } catch (caught) {
         setToast({ kind: 'error', title: 'Action failed', body: caught.message });
@@ -142,60 +145,86 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
     [load]
   );
 
+  const toastForDispatch = useCallback((result, success) => {
+    if (result?.dispatch?.delivered === false) {
+      setToast({
+        kind: 'error',
+        title: 'Dispatch failed',
+        body: 'Failed delivery - contact ranger team by radio'
+      });
+      return;
+    }
+    setToast(success);
+  }, []);
+
   const acknowledgeAndDispatch = useCallback(
-    (alertId) => respond(alertId, 'acknowledge_dispatch').then((result) => {
-      setToast({ kind: 'success', title: 'Addressed', body: 'Response Team Dispatched', alertId });
-      return result;
-    }),
-    [respond]
+    (alertId) =>
+      respond(alertId, 'acknowledge_dispatch').then((result) => {
+        toastForDispatch(result, {
+          kind: 'success',
+          title: 'Addressed',
+          body: 'Response Team Dispatched',
+          alertId
+        });
+        return result;
+      }),
+    [respond, toastForDispatch]
   );
 
   const monitorClosely = useCallback(
-    (alertId) => respond(alertId, 'monitor_closely').then(() => {
-      setToast({ kind: 'info', title: 'Monitoring', body: 'Alert kept under observation', alertId });
-    }),
+    (alertId) =>
+      respond(alertId, 'monitor_closely').then(() => {
+        setToast({ kind: 'info', title: 'Monitoring', body: 'Alert kept under observation', alertId });
+      }),
     [respond]
   );
 
   const markFalseAlarm = useCallback(
-    (alertId, notes) => respond(alertId, 'mark_false_alarm', { notes }).then(() => {
-      setToast({ kind: 'info', title: 'Alert dismissed', body: 'Logged as false alarm', alertId });
-    }),
+    (alertId, notes) =>
+      respond(alertId, 'mark_false_alarm', { notes }).then(() => {
+        setToast({ kind: 'info', title: 'Alert dismissed', body: 'Logged as false alarm', alertId });
+      }),
     [respond]
   );
 
   const decideDelayedPatrolCheck = useCallback(
-    (alertId) => respond(alertId, 'dispatch_patch_check').then(() => {
-      setToast({ kind: 'success', title: 'Patrol check', body: 'Response Team Dispatched', alertId });
-    }),
-    [respond]
+    (alertId) =>
+      respond(alertId, 'dispatch_patch_check').then((result) => {
+        toastForDispatch(result, {
+          kind: 'success',
+          title: 'Patrol check',
+          body: 'Response Team Dispatched',
+          alertId
+        });
+      }),
+    [respond, toastForDispatch]
   );
 
   const setZoneEnabled = useCallback(
     async (zoneId, enabled) => {
+      // Optimistic, but the load below always restores the server's truth.
       setZones((current) =>
         current.map((zone) => (zone.zoneId === zoneId ? { ...zone, enabled } : zone))
       );
-      setVisibleZoneIds((current) => {
-        const ids = current ?? zones.map((zone) => zone.zoneId);
-        return enabled ? [...new Set([...ids, zoneId])] : ids.filter((id) => id !== zoneId);
-      });
       try {
         await api.setGeofenceEnabled(zoneId, enabled);
         await load();
       } catch (caught) {
-        setError(caught.message);
+        // The refresh clears `error`, so report the failure after it.
         await load();
+        setError(caught.message);
       }
     },
-    [load, zones]
+    [load]
   );
 
-  const toggleAllZones = useCallback(() => {
-    const ids = zones.map((zone) => zone.zoneId);
-    const allVisible = (visibleZoneIds ?? ids).length === ids.length;
-    setVisibleZoneIds(allVisible ? [] : ids);
-  }, [zones, visibleZoneIds]);
+  const toggleAllZones = useCallback(async () => {
+    const shouldShow = visibleZoneIds.length !== zones.length;
+    const changes = zones
+      .filter((zone) => (zone.enabled !== false) !== shouldShow)
+      .map((zone) => setZoneEnabled(zone.zoneId, shouldShow));
+    await Promise.all(changes);
+  }, [zones, visibleZoneIds, setZoneEnabled]);
 
   const dismissToast = useCallback(() => setToast(null), []);
 
@@ -242,7 +271,7 @@ export default function useCollarAlerts({ pollIntervalMs = POLL_INTERVAL_MS } = 
     lostCollars: visibleLostCollars,
     sessionExpired,
     toast,
-    visibleZoneIds: visibleZoneIds ?? zones.map((zone) => zone.zoneId),
+    visibleZoneIds,
     acknowledgeAndDispatch,
     monitorClosely,
     markFalseAlarm,

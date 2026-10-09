@@ -82,7 +82,7 @@ export const COLLAR_STATUS_TONE = {
 };
 
 /** Sub-label for the threat badge, mirroring the high-fidelity wireframe. */
-export const ZONE_KIND_LABEL = {
+const ZONE_KIND_LABEL = {
   farmland: 'Poaching Risk Zone',
   village: 'Village Conflict Zone',
   road: 'Road Crossing Hazard',
@@ -90,13 +90,17 @@ export const ZONE_KIND_LABEL = {
   other: 'High-Risk Zone'
 };
 
-export const ZONE_KIND_SHORT = {
+const ZONE_KIND_SHORT = {
   farmland: 'Farmland',
   village: 'Village edge',
   road: 'Road crossing',
   settlement: 'Settlement',
   other: 'High-risk'
 };
+
+/** Lookups that always return something, so callers need no fallback logic. */
+export const zoneKindLabel = (kind) => ZONE_KIND_LABEL[kind] ?? ZONE_KIND_LABEL.other;
+export const zoneKindShort = (kind) => ZONE_KIND_SHORT[kind] ?? ZONE_KIND_SHORT.other;
 
 /** Breaches the officer can still act on. */
 export const OPEN_STATUSES = [ALERT_STATUS.ACTIVE, ALERT_STATUS.ACKNOWLEDGED, ALERT_STATUS.DELAYED];
@@ -106,8 +110,14 @@ export const HANDLED_STATUSES = [ALERT_STATUS.DISMISSED, ALERT_STATUS.RESOLVED];
 
 export const isOpen = (alert) => OPEN_STATUSES.includes(alert.status);
 
+/** Breach time as the high-fidelity wireframe shows it: "14:38 GMT". */
 export const formatGmt = (value) =>
-  `${new Date(value).toLocaleTimeString('en-GB', { hour12: false, timeZone: 'GMT' })} GMT`;
+  `${new Date(value).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'GMT'
+  })} GMT`;
 
 export const formatGmtStamp = (value) =>
   new Date(value).toLocaleString('en-GB', {

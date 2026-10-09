@@ -74,6 +74,7 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
                 <li key={alert.alertId} className="border-b border-stone-100 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-stone-900">{alert.collarId}</span>
+                    <span className="font-mono text-[11px] text-stone-400">{alert.alertId}</span>
                     <Badge tone={alert.status === ALERT_STATUS.DELAYED ? 'medium' : 'low'} size="sm">
                       {alert.status === ALERT_STATUS.DELAYED ? 'Delayed' : 'Patrol check sent'}
                     </Badge>

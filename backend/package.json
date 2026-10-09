@@ -4,12 +4,19 @@
   "scripts": {
     "dev": "node server.js",
     "seed": "node seed/seedReferenceData.js",
-    "seed:reset": "node seed/resetOperationalData.js"
+    "seed:reset": "node seed/resetOperationalData.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "express": "^4.19.0",
-    "mongoose": "^8.4.0",
     "dotenv": "^16.4.0",
-    "jsonwebtoken": "^9.0.2"
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "vitest": "^2.1.9"
   }
 }

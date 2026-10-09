@@ -105,6 +105,38 @@ and post real fixes to `POST /api/telemetry/fixes`.
 | Exception 2. Session expired | `SessionExpiredOverlay` (client-side until auth exists) |
 | Exception 3. Dispatch failed after retries | `alertService.sendDispatch`, 3 attempts logged |
 
+### Tests
+
+```bash
+cd backend      && npm test           # 168 tests
+cd frontend/web && npm test           # 160 tests
+
+npm run test:coverage    # enforces the thresholds below
+```
+
+| Package | Statements | Branches | Functions | Lines |
+| --- | --- | --- | --- | --- |
+| backend | 96.5% | 87.8% | 96.2% | 96.5% |
+| frontend/web | 98.4% | 93.1% | 88.0% | 98.4% |
+
+Both `vitest.config` files set thresholds (80% lines/functions/statements,
+70–75% branches) so `npm run test:coverage` fails the build if coverage drops.
+
+| Area | What is covered |
+| --- | --- |
+| `utils/geo.js` | Haversine, point-in-polygon (incl. concave), segment distance, coordinate validation |
+| `services/geofenceService.js` | Zone evaluation, multi-zone severity preference, nearest ranger, severity monotonicity, queue priority |
+| `services/alertService.js` | Ingest, one-alert-per-episode suppression, false-alarm cooldown, all four responses, 3-retry dispatch, malformed input |
+| `services/telemetrySimulator.js` | Scripted tracks, signal loss, batch replay, deterministic seed, no overlapping ticks |
+| `controllers/*` | Status codes (200/201/400/404/409), param parsing, error forwarding |
+| `services/api.js` | Request shape, every endpoint, network failure, non-JSON error page |
+| `hooks/useCollarAlerts.js` | Polling, critical-alert announcement, response actions, geofence toggles |
+| `components/**` | Critical alert modal, false alarm validation, queue ordering, geofence and collar panels, placeholders |
+
+`DashboardMap.jsx` is excluded from the frontend coverage figure because
+Leaflet needs a real layout engine; its rendering is verified separately in a
+headless browser.
+
 ### Correctness notes
 
 - **Severity is monotonic.** Approaching -> inside -> deep inside only

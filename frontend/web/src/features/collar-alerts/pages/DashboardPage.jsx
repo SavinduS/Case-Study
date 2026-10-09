@@ -85,6 +85,12 @@ export default function DashboardPage() {
   const activeZone = zones.find((zone) => zone.zoneId === activeAlert?.zoneId) ?? null;
   const placeholder = activeModule ? MODULE_OWNERS[activeModule] : null;
 
+  // Named handlers rather than inline arrows, so each demo control is a
+  // single, traceable call into the hook.
+  const openRecords = () => setDrawerOpen((value) => !value);
+  const forceSessionExpiry = () => alerts.setSessionExpired(true);
+  const forceSignalLoss = () => alerts.simulateSignalLost();
+
   /** Clicking a collar marker opens its alert, or just pans to it. */
   const selectAlertByCollar = useCallback(
     (collarId) => {
@@ -180,10 +186,10 @@ export default function DashboardPage() {
       <DispatchToast toast={toast} onDismiss={alerts.dismissToast} />
 
       <DemoControls
-        onOpenRecords={() => setDrawerOpen((value) => !value)}
-        onSimulateSignalLost={() => alerts.simulateSignalLost()}
-        onForceSessionExpiry={() => alerts.setSessionExpired(true)}
+        onOpenRecords={openRecords}
         onRefresh={alerts.refresh}
+        onForceSignalLoss={forceSignalLoss}
+        onForceSessionExpiry={forceSessionExpiry}
       />
 
       <CriticalAlertModal
@@ -227,14 +233,14 @@ function ApiErrorBanner({ message, onRetry }) {
 }
 
 /** Small strip of controls used to demonstrate the exception flows. */
-function DemoControls({ onOpenRecords, onSimulateSignalLoss, onForceSessionExpiry, onRefresh }) {
+function DemoControls({ onOpenRecords, onRefresh, onForceSignalLoss, onForceSessionExpiry }) {
   return (
     <div className="absolute left-16 top-1/2 z-[700] -translate-y-1/2 rounded-md bg-white/95 p-2 shadow-lg">
       <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-stone-500">Flows</p>
       <div className="flex flex-col gap-1">
         <DemoButton label="Records" onClick={onOpenRecords} />
         <DemoButton label="Refresh" onClick={onRefresh} />
-        <DemoButton label="Signal lost" onClick={onSimulateSignalLoss} />
+        <DemoButton label="Signal lost" onClick={onForceSignalLoss} />
         <DemoButton label="Session timeout" onClick={onForceSessionExpiry} />
       </div>
     </div>

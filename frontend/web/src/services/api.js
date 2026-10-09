@@ -32,7 +32,16 @@ async function request(path, { method = 'GET', body } = {}) {
   if (response.status === 204) return null;
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  // A proxy or gateway can answer with an HTML error page rather than JSON,
+  // so parsing must not be allowed to replace the real status message.
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(payload?.message ?? `Request failed (${response.status})`, response.status);

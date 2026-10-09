@@ -13,3 +13,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# test output
+coverage/

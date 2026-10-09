@@ -5,7 +5,7 @@ import Badge from '../../../../components/ui/Badge.jsx';
 import AlertMiniMap from './AlertMiniMap.jsx';
 import FalseAlarmDialog from './FalseAlarmDialog.jsx';
 import DispatchDialog from './DispatchDialog.jsx';
-import { ALERT_STATUS, THREAT_LEVEL, THREAT_TONE, ZONE_KIND_LABEL, formatGmt } from '../../domain/labels.js';
+import { ALERT_STATUS, THREAT_TONE, formatGmt, zoneKindLabel } from '../../domain/labels.js';
 
 /**
  * CriticalAlertModal — the instant visual + acoustic alert raised when the
@@ -109,7 +109,7 @@ export default function CriticalAlertModal({
                   <dd className="mt-1 flex items-center gap-2">
                     <Badge tone={THREAT_TONE[alert.threatLevel]}>{alert.threatLevel}</Badge>
                     <span className="text-sm font-medium text-stone-700">
-                      {ZONE_KIND_LABEL[zone?.kind] ?? 'High-Risk Zone'}
+                      {zoneKindLabel(zone?.kind)}
                     </span>
                   </dd>
                 </div>
