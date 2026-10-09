@@ -3,14 +3,20 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    // Every suite in this scope shares one dedicated test database (see
+    // tests/helpers/db.js). Running files in parallel would have them truncating
+    // each other's collections, so they run sequentially in one process.
+    fileParallelism: false,
     // Scoped so Vitest does not claim the Jest suites in tests/*.test.js.
-    include: ['tests/collar-alerts/**/*.test.js'],
+    // The Member 2 analytics suites live here so they are measured by this
+    // runner; the Jest suites still run them independently.
+    include: ['tests/collar-alerts/**/*.test.js', 'tests/analytics/**/*.test.js'],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html', 'lcov'],
       reportsDirectory: 'coverage',
-      // Scoped to the Collar Boundary Alerts code only. The other use cases in
-      // this repo are covered by their own runners (see backend/package.json).
+      // The collar-alerts suites are the Member 4 use case; the analytics
+      // suites are Member 2. Both are measured here against the 80% brief.
       include: [
         'utils/geo.js',
         'utils/collarAlertConstants.js',
@@ -21,7 +27,13 @@ export default defineConfig({
         'controllers/auditController.js',
         'controllers/collarController.js',
         'controllers/geofenceController.js',
-        'controllers/telemetryController.js'
+        'controllers/telemetryController.js',
+        // Park Management and Patrol Analytics Reports (Member 2)
+        'services/analyticsService.js',
+        'controllers/analyticsController.js',
+        'config/areas.js',
+        'models/AnalyticsReport.js',
+        'models/PatrolRecord.js'
       ],
       thresholds: {
         // The brief asks for 80% of functionality covered.

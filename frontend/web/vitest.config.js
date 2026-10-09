@@ -19,6 +19,8 @@ export default defineConfig({
         'src/features/collar-alerts/components/**/*.jsx',
         'src/features/collar-alerts/hooks/**/*.js',
         'src/features/collar-alerts/pages/**/*.jsx',
+        // Park Management and Patrol Analytics Reports (Member 2)
+        'src/features/reports/**/*.{js,jsx}',
         'src/components/ui/**/*.jsx',
         'src/layout/**/*.jsx'
       ],
