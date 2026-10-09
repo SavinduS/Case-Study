@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,7 +35,6 @@ interface Props {
   photoError: string | null;
   onSubmit: (data: SubmitData) => void;
   onOpenPicker: () => void;
-  onOpenMyReports: () => void;
   onPhotoChange: (uri: string | null) => void;
 }
 
@@ -51,7 +49,6 @@ export default function SubmitReportScreen({
   photoError,
   onSubmit,
   onOpenPicker,
-  onOpenMyReports,
   onPhotoChange
 }: Props) {
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
@@ -98,14 +95,6 @@ export default function SubmitReportScreen({
             <Text style={styles.appName}>Wildlife Alert</Text>
             <Text style={styles.title}>Submit Conflict Report</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open My Reports"
-            onPress={onOpenMyReports}
-            style={({ pressed }) => [styles.myReportsButton, pressed && styles.myReportsPressed]}
-          >
-            <Text style={styles.myReportsLink}>My Reports →</Text>
-          </Pressable>
         </View>
 
         {serverError ? <StatusBanner tone="error" title="Report not sent" message={serverError} /> : null}
@@ -177,19 +166,6 @@ const styles = StyleSheet.create({
   },
   titleText: {
     flex: 1
-  },
-  myReportsButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm
-  },
-  myReportsPressed: {
-    opacity: 0.6
-  },
-  myReportsLink: {
-    color: colors.primary,
-    fontSize: font.small,
-    fontWeight: '700'
   },
   appName: {
     color: colors.primary,
