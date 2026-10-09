@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Wildlife Alert",
+    "slug": "wildlife-alert",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["android", "ios"],
+    "ios": {
+      "bundleIdentifier": "lk.ac.mrt.se3070.wildlifealert",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Your location is used to record where the wildlife conflict happened.",
+        "NSCameraUsageDescription": "The camera is used to attach optional evidence to your conflict report.",
+        "NSPhotoLibraryUsageDescription": "The photo library is used to attach optional evidence to your conflict report."
+      }
+    },
+    "android": {
+      "package": "lk.ac.mrt.se3070.wildlifealert",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    }
+  }
+}
