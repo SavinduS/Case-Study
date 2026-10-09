@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import Sidebar from '../../../layout/Sidebar.jsx';
+import Sidebar, { RAIL } from '../../../layout/Sidebar.jsx';
 import DashboardMap from '../components/map/DashboardMap.jsx';
 import CriticalAlertModal from '../components/alerts/CriticalAlertModal.jsx';
 import ActiveAlertsPanel from '../components/alerts/ActiveAlertsPanel.jsx';
@@ -11,6 +11,10 @@ import CollarRegistryPanel from '../components/panels/CollarRegistryPanel.jsx';
 import GeofencePanel from '../components/panels/GeofencePanel.jsx';
 import ModulePlaceholder from '../../../components/ui/ModulePlaceholder.jsx';
 import useCollarAlerts from '../hooks/useCollarAlerts.js';
+
+// Modules this use case owns and therefore can actually open, mirroring the
+// owned entries in the shared rail.
+const OWNED_MODULES = RAIL.filter((item) => !item.owner);
 
 const MODULE_OWNERS = {
   incidents: {
@@ -124,7 +128,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-park-900">
+    <div className="relative h-full w-full overflow-hidden bg-park-900 pb-14 lg:pb-0">
       {error && <ApiErrorBanner message={error} onRetry={alerts.refresh} />}
 
       <DashboardMap
@@ -140,8 +144,33 @@ export default function DashboardPage() {
 
       <Sidebar activeKey={activeModule} onSelect={setActiveModule} />
 
+      {/* The rail is hidden on narrow screens, so mirror the modules this use
+          case owns as a segmented control. Without it the collar and geofence
+          panels would be unreachable on a phone. */}
+      <nav
+        aria-label="Modules (compact)"
+        className="absolute inset-x-0 top-0 z-[850] flex gap-1.5 overflow-x-auto bg-park-900/95
+          px-3 py-2 backdrop-blur lg:hidden"
+      >
+        {OWNED_MODULES.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            aria-current={activeModule === item.key ? 'page' : undefined}
+            onClick={() => setActiveModule(item.key)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              activeModule === item.key
+                ? 'bg-moss-500 text-white'
+                : 'bg-white/10 text-white/75 hover:bg-white/20'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       {placeholder ? (
-        <div className="absolute inset-0 left-14 z-[850]">
+        <div className="absolute inset-0 z-[850] lg:left-14">
           <ModulePlaceholder {...placeholder} />
         </div>
       ) : (
@@ -213,7 +242,8 @@ function ApiErrorBanner({ message, onRetry }) {
   return (
     <div
       role="alert"
-      className="absolute left-1/2 top-4 z-[1600] -translate-x-1/2 rounded-md border border-alert-600/40 bg-alert-100 px-4 py-2.5 shadow-lg"
+      className="absolute inset-x-3 top-3 z-[1600] rounded-md border border-alert-600/40 bg-alert-100
+        px-3 py-2 shadow-lg lg:left-1/2 lg:top-4 lg:-translate-x-1/2 lg:px-4 lg:py-2.5"
     >
       <div className="flex items-center gap-3">
         <div>
@@ -235,7 +265,8 @@ function ApiErrorBanner({ message, onRetry }) {
 /** Small strip of controls used to demonstrate the exception flows. */
 function DemoControls({ onOpenRecords, onRefresh, onForceSignalLoss, onForceSessionExpiry }) {
   return (
-    <div className="absolute left-16 top-1/2 z-[700] -translate-y-1/2 rounded-md bg-white/95 p-2 shadow-lg">
+    <div className="absolute left-16 top-1/2 z-[700] hidden -translate-y-1/2 rounded-md bg-white/95 p-2
+        shadow-lg lg:block">
       <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-stone-500">Flows</p>
       <div className="flex flex-col gap-1">
         <DemoButton label="Records" onClick={onOpenRecords} />

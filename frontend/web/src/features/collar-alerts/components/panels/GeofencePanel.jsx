@@ -12,7 +12,10 @@ export default function GeofencePanel({ zones, openAlertCounts, visibleZoneIds, 
   return (
     <section
       aria-label="Geofences"
-      className="absolute right-0 top-0 z-[800] flex h-full w-80 flex-col border-l border-stone-200 bg-white shadow-xl"
+      className="fixed inset-x-0 bottom-0 z-[800] flex max-h-[75vh] flex-col rounded-t-2xl
+        border-t border-stone-200 bg-white shadow-2xl
+        lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:top-0 lg:h-full lg:max-h-none
+        lg:w-80 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-xl"
     >
       <header className="flex items-center gap-2 border-b border-stone-200 bg-park-800 px-4 py-3 text-white">
         <h2 className="text-sm font-bold uppercase tracking-wide">High-Risk Geofences</h2>

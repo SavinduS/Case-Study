@@ -83,4 +83,14 @@ export const reportSignalLost = (collarId, lost = true, reason) =>
 export const createIncident = (body) => request('/incidents', { method: 'POST', body });
 export const getMyIncidents = () => request('/incidents/mine');
 
+// Analytics workspace contract. Kept alongside the shared client so feature
+// pages and consumers can use one API surface.
+export const getAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const getSavedAnalyticsReports = () => request('/analytics/reports');
+export const saveAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const exportAnalyticsReport = (reportId, format) =>
+  request(`/analytics/reports/${encodeURIComponent(reportId)}/export?format=${format}`);
+
 export { ApiError };

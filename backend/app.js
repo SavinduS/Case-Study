@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const { isConnected } = require('./config/db');
 
 const app = express();
 app.use(express.json());
@@ -30,13 +31,36 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
+// Liveness only: proves this process is up and speaking HTTP. The mobile
+// client uses it to find which port the API is on, and a database outage must
+// not make it hunt for a different port — the port is still correct. Readiness
+// (database included) is /health/ready below.
 app.get('/health', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ ok: true });
 });
+
+// Readiness: the database is what every other endpoint depends on, so this is
+// what a load balancer or an operator should poll.
+app.get('/health/ready', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const ready = isConnected();
+  res.status(ready ? 200 : 503).json({ ok: ready, database: ready ? 'connected' : 'disconnected' });
+});
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Fail fast instead of letting queries queue in the mongoose buffer. Without
+// this a request that arrives while Atlas is reconnecting waits the full
+// bufferTimeoutMS and then fails anyway; the mobile client has already given up
+// by then, so the report is lost with only a timeout in the logs.
+app.use('/api', (req, res, next) => {
+  if (isConnected()) return next();
+  res.status(503).json({ message: 'Database unavailable. Please retry.' });
+});
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/incidents', require('./routes/incidents'));
+app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/conflict-reports', require('./routes/conflictReports'));
 
 // Manage Wildlife Collar Boundary Alerts.

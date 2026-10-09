@@ -10,7 +10,8 @@ const LEGEND = [
 /** Bottom-left map legend from the storyboard frames. */
 export default function MapLegend({ zones = [] }) {
   return (
-    <div className="pointer-events-none absolute bottom-4 left-16 z-[700] rounded-md bg-white/95 p-3 shadow-lg">
+    <div className="pointer-events-none absolute bottom-4 left-16 z-[700] hidden rounded-md
+        bg-white/95 p-3 text-[11px] shadow-lg lg:block">
       <ul className="space-y-1.5">
         {LEGEND.map((item) => (
           <li key={item.key} className="flex items-center gap-2 text-[11px] font-medium text-stone-700">
