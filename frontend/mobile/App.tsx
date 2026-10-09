@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, SafeAreaView, StyleSheet } from 'react-native';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import { ApiError, createReport, NetworkError } from './src/api/client';
+import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
 import {
@@ -12,7 +13,7 @@ import {
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type View = 'form' | 'success';
+type View = 'form' | 'success' | 'pickLocation';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
@@ -91,8 +92,12 @@ export default function App() {
   }
 
   function openLocationPicker() {
-    // Map-based manual picker arrives in the next commit
-    Alert.alert('Change location', 'The map location picker is not available yet.');
+    setView('pickLocation');
+  }
+
+  function handleLocationPicked(fix: { coordinates: [number, number]; accuracyMeters?: number }) {
+    setGps({ status: 'located', fix, manual: true });
+    setView('form');
   }
 
   return (
@@ -100,6 +105,13 @@ export default function App() {
       <StatusBar style="dark" />
       {view === 'success' && confirmation ? (
         <ReportSuccessScreen confirmation={confirmation} onDone={handleDone} />
+      ) : view === 'pickLocation' ? (
+        <LocationPickerScreen
+          initialFix={gps.fix}
+          initialManual={gps.manual}
+          onConfirm={handleLocationPicked}
+          onCancel={() => setView('form')}
+        />
       ) : (
         <SubmitReportScreen
           key={formKey}
