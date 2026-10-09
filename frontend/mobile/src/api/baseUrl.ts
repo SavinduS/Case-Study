@@ -13,7 +13,8 @@ async function probe(base: string, timeoutMs: number): Promise<boolean> {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${base}/health`, { signal: controller.signal });
-    return res.ok;
+    // 304 (revalidated cache) still proves the server is there
+    return res.ok || res.status === 304;
   } catch {
     return false;
   } finally {
