@@ -1,15 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { INCIDENT_LABELS, INCIDENT_TYPE_ORDER } from '../constants/incidentTypes';
 import { colors, font, radius, spacing } from '../theme';
 import type { IncidentType } from '../types';
 
-const OPTIONS: { value: IncidentType; label: string }[] = [
-  { value: 'elephant_sighting', label: 'Elephant Sighting' },
-  { value: 'crop_damage', label: 'Crop Damage' },
-  { value: 'wildlife_near_home', label: 'Wildlife Near Home' },
-  { value: 'wildlife_blocking_road', label: 'Wildlife Blocking Road' },
-  { value: 'other_wildlife_conflict', label: 'Other Wildlife Conflict' }
-];
+const OPTIONS: { value: IncidentType; label: string }[] = INCIDENT_TYPE_ORDER.map(
+  (value) => ({ value, label: INCIDENT_LABELS[value] })
+);
 
 interface Props {
   value: IncidentType | null;

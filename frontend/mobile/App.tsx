@@ -10,6 +10,7 @@ import {
   uploadPhoto
 } from './src/api/client';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
+import MyReportsScreen from './src/screens/MyReportsScreen';
 import ReportPendingScreen from './src/screens/ReportPendingScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
@@ -22,12 +23,17 @@ import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offline
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type View = 'form' | 'success' | 'pickLocation' | 'pending';
+type View = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
 export default function App() {
-  const [view, setView] = useState<View>('form');
+  const [view, setViewState] = useState<View>('form');
+  const viewRef = useRef<View>('form');
+  const setView = useCallback((next: View) => {
+    viewRef.current = next;
+    setViewState(next);
+  }, []);
   const [gps, setGps] = useState<GpsState>(INITIAL_GPS);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -81,6 +87,8 @@ export default function App() {
       if (!ref) return;
       const item = result.synced.find((i) => i.clientRefId === ref);
       if (!item?.reportId) return;
+      // Only the pending screen auto-replaces itself with the confirmation
+      if (viewRef.current !== 'pending') return;
 
       let confirmationData: ConflictReportConfirmation;
       try {
@@ -227,6 +235,11 @@ export default function App() {
           onConfirm={handleLocationPicked}
           onCancel={() => setView('form')}
         />
+      ) : view === 'myReports' ? (
+        <MyReportsScreen
+          onBack={() => setView('form')}
+          onRefreshReports={flushSavedReports}
+        />
       ) : (
         <SubmitReportScreen
           key={formKey}
@@ -238,6 +251,7 @@ export default function App() {
           photoError={photoError}
           onSubmit={handleSubmit}
           onOpenPicker={openLocationPicker}
+          onOpenMyReports={() => setView('myReports')}
           onPhotoChange={handlePhotoChange}
         />
       )}
