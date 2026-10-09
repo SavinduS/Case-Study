@@ -137,7 +137,11 @@ async function syncConflictReports(req, res, next) {
     const results = [];
     for (const item of reports) {
       if (!item || !item.clientRefId) {
-        results.push({ ok: false, errors: { clientRefId: 'clientRefId is required for sync' } });
+        results.push({
+          ok: false,
+          message: 'clientRefId is required for sync',
+          errors: { clientRefId: 'clientRefId is required for sync' }
+        });
         continue;
       }
       try {
@@ -152,10 +156,16 @@ async function syncConflictReports(req, res, next) {
           reportId: result.payload.reportId,
           status: result.payload.status,
           alreadySynced: Boolean(result.payload.alreadySynced),
+          message: result.payload.message || null,
           errors: result.payload.errors || null
         });
       } catch (e) {
-        results.push({ clientRefId: item.clientRefId, ok: false, errors: { message: e.message } });
+        results.push({
+          clientRefId: item.clientRefId,
+          ok: false,
+          message: e.message,
+          errors: { message: e.message }
+        });
       }
     }
     res.json({ synced: results.filter((r) => r.ok).length, results });

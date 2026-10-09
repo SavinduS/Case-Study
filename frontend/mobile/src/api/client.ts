@@ -18,9 +18,25 @@ export class ApiError extends Error {
 }
 
 export class NetworkError extends Error {
-  constructor(message = 'Cannot reach the server') {
+  constructor(
+    message = `Cannot reach the server at ${API_BASE_URL}. Check EXPO_PUBLIC_API_BASE_URL in frontend/mobile/.env and allow Node.js through the Windows firewall.`
+  ) {
     super(message);
     this.name = 'NetworkError';
+  }
+}
+
+// Cheap reachability probe for the My Reports banner ("is the server there?")
+export async function pingServer(timeoutMs = 4000): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

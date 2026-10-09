@@ -10,6 +10,7 @@ import {
   uploadPhoto
 } from './src/api/client';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
+import MyReportsScreen from './src/screens/MyReportsScreen';
 import ReportPendingScreen from './src/screens/ReportPendingScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
@@ -18,16 +19,21 @@ import {
   GpsState,
   requestLocationPermission
 } from './src/services/location';
-import { enqueue, flushQueue } from './src/services/offlineQueue';
+import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offlineQueue';
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type View = 'form' | 'success' | 'pickLocation' | 'pending';
+type View = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
 export default function App() {
-  const [view, setView] = useState<View>('form');
+  const [view, setViewState] = useState<View>('form');
+  const viewRef = useRef<View>('form');
+  const setView = useCallback((next: View) => {
+    viewRef.current = next;
+    setViewState(next);
+  }, []);
   const [gps, setGps] = useState<GpsState>(INITIAL_GPS);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -81,6 +87,8 @@ export default function App() {
       if (!ref) return;
       const item = result.synced.find((i) => i.clientRefId === ref);
       if (!item?.reportId) return;
+      // Only the pending screen auto-replaces itself with the confirmation
+      if (viewRef.current !== 'pending') return;
 
       let confirmationData: ConflictReportConfirmation;
       try {
@@ -112,6 +120,15 @@ export default function App() {
     });
     return unsubscribe;
   }, [detectLocation, flushSavedReports]);
+
+  // The reconnect event can fire before the network actually works — keep
+  // retrying while the app is open so pending rows never wait for a manual tap
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void flushSavedReports();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [flushSavedReports]);
 
   // FR-13: server unreachable → keep the report on the device
   async function saveOffline(data: SubmitData, uploadedPhotoUrl?: string) {
@@ -160,6 +177,12 @@ export default function App() {
 
     try {
       const result = await createReport({ ...data, photoUrl });
+      const storedPayload = { ...data, ...(photoUrl ? { photoUrl } : {}) };
+      try {
+        await recordOnlineSuccess(result, storedPayload);
+      } catch {
+        // local history is best-effort; the confirmation screen still shows the id
+      }
       setConfirmation(result);
       setSubmitting(false);
       setView('success');
@@ -221,6 +244,11 @@ export default function App() {
           onConfirm={handleLocationPicked}
           onCancel={() => setView('form')}
         />
+      ) : view === 'myReports' ? (
+        <MyReportsScreen
+          onBack={() => setView('form')}
+          onRefreshReports={flushSavedReports}
+        />
       ) : (
         <SubmitReportScreen
           key={formKey}
@@ -232,6 +260,7 @@ export default function App() {
           photoError={photoError}
           onSubmit={handleSubmit}
           onOpenPicker={openLocationPicker}
+          onOpenMyReports={() => setView('myReports')}
           onPhotoChange={handlePhotoChange}
         />
       )}
