@@ -1,7 +1,8 @@
 import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   ApiError,
   createReport,
@@ -10,10 +11,12 @@ import {
   pingServer,
   uploadPhoto
 } from './src/api/client';
+import TabBar from './src/components/TabBar';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import ReportPendingScreen from './src/screens/ReportPendingScreen';
 import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
+import SmsGuideScreen from './src/screens/SmsGuideScreen';
 import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
 import {
   getCurrentFix,
@@ -24,14 +27,14 @@ import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offline
 import { colors } from './src/theme';
 import type { ConflictReportConfirmation } from './src/types';
 
-type View = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports';
+type AppView = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports' | 'smsGuide';
 
 const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
 
 export default function App() {
-  const [view, setViewState] = useState<View>('form');
-  const viewRef = useRef<View>('form');
-  const setView = useCallback((next: View) => {
+  const [view, setViewState] = useState<AppView>('form');
+  const viewRef = useRef<AppView>('form');
+  const setView = useCallback((next: AppView) => {
     viewRef.current = next;
     setViewState(next);
   }, []);
@@ -233,40 +236,45 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="dark" />
-      {view === 'success' && confirmation ? (
-        <ReportSuccessScreen confirmation={confirmation} onDone={handleDone} />
-      ) : view === 'pending' && pendingLocalRef ? (
-        <ReportPendingScreen localRef={pendingLocalRef} onDone={handleDone} />
-      ) : view === 'pickLocation' ? (
-        <LocationPickerScreen
-          initialFix={gps.fix}
-          initialManual={gps.manual}
-          onConfirm={handleLocationPicked}
-          onCancel={() => setView('form')}
-        />
-      ) : view === 'myReports' ? (
-        <MyReportsScreen
-          onBack={() => setView('form')}
-          onRefreshReports={flushSavedReports}
-        />
-      ) : (
-        <SubmitReportScreen
-          key={formKey}
-          gps={gps}
-          submitting={submitting}
-          serverError={serverError}
-          fieldErrors={fieldErrors}
-          photoUri={photoUri}
-          photoError={photoError}
-          onSubmit={handleSubmit}
-          onOpenPicker={openLocationPicker}
-          onOpenMyReports={() => setView('myReports')}
-          onPhotoChange={handlePhotoChange}
-        />
-      )}
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safe}>
+        <StatusBar style="dark" />
+        <View style={styles.content}>
+          {view === 'success' && confirmation ? (
+            <ReportSuccessScreen confirmation={confirmation} onDone={handleDone} />
+          ) : view === 'pending' && pendingLocalRef ? (
+            <ReportPendingScreen localRef={pendingLocalRef} onDone={handleDone} />
+          ) : view === 'pickLocation' ? (
+            <LocationPickerScreen
+              initialFix={gps.fix}
+              initialManual={gps.manual}
+              onConfirm={handleLocationPicked}
+              onCancel={() => setView('form')}
+            />
+          ) : view === 'myReports' ? (
+            <MyReportsScreen onRefreshReports={flushSavedReports} />
+          ) : view === 'smsGuide' ? (
+            <SmsGuideScreen />
+          ) : (
+            <SubmitReportScreen
+              key={formKey}
+              gps={gps}
+              submitting={submitting}
+              serverError={serverError}
+              fieldErrors={fieldErrors}
+              photoUri={photoUri}
+              photoError={photoError}
+              onSubmit={handleSubmit}
+              onOpenPicker={openLocationPicker}
+              onPhotoChange={handlePhotoChange}
+            />
+          )}
+        </View>
+        {view === 'success' || view === 'pending' || view === 'pickLocation' ? null : (
+          <TabBar active={view} onSelect={setView} />
+        )}
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -274,5 +282,8 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg
+  },
+  content: {
+    flex: 1
   }
 });

@@ -12,11 +12,11 @@ import { ApiError, getReport, pingServer } from '../api/client';
 import { INCIDENT_LABELS } from '../constants/incidentTypes';
 import { listReports } from '../services/offlineQueue';
 import StatusBanner from '../components/StatusBanner';
+import ScreenHeader from '../components/ScreenHeader';
 import { colors, font, radius, spacing } from '../theme';
 import type { QueuedReport } from '../types';
 
 interface Props {
-  onBack: () => void;
   onRefreshReports: () => Promise<void>;
 }
 
@@ -36,7 +36,7 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
+export default function MyReportsScreen({ onRefreshReports }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -148,28 +148,21 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
     );
   }
 
+  const refreshButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Refresh reports"
+      onPress={handleRefresh}
+      disabled={refreshing}
+      style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+    >
+      <Text style={styles.headerLink}>{refreshing ? '…' : 'Refresh'}</Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to report form"
-          onPress={onBack}
-          style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.headerLink}>← Back</Text>
-        </Pressable>
-        <Text style={styles.title}>My Reports</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Refresh reports"
-          onPress={handleRefresh}
-          disabled={refreshing}
-          style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.headerLink}>{refreshing ? '…' : 'Refresh'}</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader title="My Reports" right={refreshButton} />
 
       <View style={styles.bannerWrap}>
         {server.state === 'checking' ? (
@@ -210,15 +203,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
-  },
   headerButton: {
     minHeight: 44,
     justifyContent: 'center',
@@ -232,13 +216,6 @@ const styles = StyleSheet.create({
   bannerWrap: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md
-  },
-  title: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.text,
-    fontSize: font.section,
-    fontWeight: '700'
   },
   listContent: {
     padding: spacing.md,
