@@ -7,23 +7,63 @@ import SignalLostBanner from '../components/alerts/SignalLostBanner.jsx';
 import SessionExpiredOverlay from '../components/alerts/SessionExpiredOverlay.jsx';
 import DispatchToast from '../components/alerts/DispatchToast.jsx';
 import OperationsDrawer from '../components/alerts/OperationsDrawer.jsx';
+import CollarRegistryPanel from '../components/panels/CollarRegistryPanel.jsx';
+import GeofencePanel from '../components/panels/GeofencePanel.jsx';
+import ModulePlaceholder from '../../../components/ui/ModulePlaceholder.jsx';
 import useCollarAlerts from '../hooks/useCollarAlerts.js';
+
+const MODULE_OWNERS = {
+  incidents: {
+    title: 'Field incidents',
+    owner: 'Mandinu R P S (IT23610620)',
+    useCaseName: 'Log Field Incident Offline (New)',
+    description:
+      'Rangers record snares, carcasses and illegal campsites offline and the record synchronises when connectivity returns.'
+  },
+  patrol: {
+    title: 'Patrol planning',
+    owner: 'Wijesingha S M (IT23538214)',
+    useCaseName: 'Park Management and Patrol Analytics Reports',
+    description:
+      'Patrol route assignment, coverage statistics and drill-down into terrain zones used to allocate ranger staff.'
+  },
+  cameras: {
+    title: 'Camera trap review',
+    owner: 'Not covered by the group design',
+    useCaseName: 'Referenced in the case study only',
+    description:
+      'The case study mentions motion-triggered camera traps, but no member owns a use case for reviewing their uploads.'
+  },
+  reports: {
+    title: 'Analytics reports',
+    owner: 'Wijesingha S M (IT23538214)',
+    useCaseName: 'Park Management and Patrol Analytics Reports',
+    description:
+      'Statistical reporting on incidents by type and location, patrol coverage and human-wildlife conflict trends.'
+  },
+  settings: {
+    title: 'Platform settings',
+    owner: 'Shared platform module',
+    useCaseName: 'Administration',
+    description:
+      'User accounts and park configuration are shared platform concerns rather than part of any single use case.'
+  }
+};
 
 /**
  * DashboardPage — "Manage Wildlife Collar Boundary Alerts".
  *
  * Composes the live park map, the Active Alerts queue, the critical alert
- * modal and the operations records drawer around useCollarAlerts.
- *
- * Demo controls in the top strip force the exception flows that cannot
- * otherwise be triggered on demand (gateway signal loss, session timeout,
- * failed dispatch delivery). They stand in for the backend faults.
+ * modal and the operations records drawer around useCollarAlerts. The
+ * module rail opens the panels this use case owns (collars, alerts,
+ * geofences) and shows an explicit placeholder for everyone else's.
  */
 export default function DashboardPage() {
   const alerts = useCollarAlerts();
   const mapRef = useRef(null);
-  const [boundaryVisible, setBoundaryVisible] = useState(true);
+  const [activeModule, setActiveModule] = useState('alerts');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [visibleZoneIds, setVisibleZoneIds] = useState(() => alerts.zones.map((zone) => zone.zoneId));
 
   const {
     collars,
@@ -49,6 +89,29 @@ export default function DashboardPage() {
     [zones, activeAlert]
   );
 
+  const visibleZones = useMemo(
+    () => zones.filter((zone) => visibleZoneIds.includes(zone.zoneId)),
+    [zones, visibleZoneIds]
+  );
+
+  const openAlertCounts = useMemo(() => {
+    const counts = {};
+    for (const alert of openAlerts) {
+      counts[alert.zoneId] = (counts[alert.zoneId] ?? 0) + 1;
+    }
+    return counts;
+  }, [openAlerts]);
+
+  const toggleZone = useCallback((zoneId) => {
+    setVisibleZoneIds((current) =>
+      current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]
+    );
+  }, []);
+
+  const toggleAllZones = useCallback(() => {
+    setVisibleZoneIds((current) => (current.length === zones.length ? [] : zones.map((z) => z.zoneId)));
+  }, [zones]);
+
   const onSelectCollar = useCallback(
     (collarId) => {
       const match = alertsByPriority.find((alert) => alert.collarId === collarId);
@@ -62,28 +125,60 @@ export default function DashboardPage() {
     [alertsByPriority, collars, alerts]
   );
 
+  const focusCollar = useCallback(
+    (collar) => {
+      mapRef.current?.locateCollar?.(collar.position);
+      const match = alertsByPriority.find((alert) => alert.collarId === collar.collarId);
+      if (match) alerts.selectAlert(match.alertId);
+    },
+    [alertsByPriority, alerts]
+  );
+
+  const placeholder = activeModule ? MODULE_OWNERS[activeModule] : null;
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-park-900">
       <DashboardMap
         ref={mapRef}
         collars={collars}
-        zones={zones}
+        zones={visibleZones}
+        totalZoneCount={zones.length}
         rangerTeams={rangerTeams}
         settlements={settlements}
         openAlerts={openAlerts}
-        boundaryVisible={boundaryVisible}
-        onToggleBoundary={() => setBoundaryVisible((value) => !value)}
         onSelectCollar={onSelectCollar}
       />
 
-      <Sidebar active="alerts" />
+      <Sidebar activeKey={activeModule} onSelect={setActiveModule} />
 
-      <ActiveAlertsPanel
-        alerts={alertsByPriority}
-        openCount={openAlerts.length}
-        selectedAlertId={activeAlert?.alertId}
-        onSelect={alerts.selectAlert}
-      />
+      {placeholder ? (
+        <div className="absolute inset-0 left-14 z-[850]">
+          <ModulePlaceholder {...placeholder} />
+        </div>
+      ) : (
+        <>
+          {activeModule === 'alerts' && (
+            <ActiveAlertsPanel
+              alerts={alertsByPriority}
+              openCount={openAlerts.length}
+              selectedAlertId={activeAlert?.alertId}
+              onSelect={alerts.selectAlert}
+            />
+          )}
+          {activeModule === 'collars' && (
+            <CollarRegistryPanel collars={collars} onFocusCollar={focusCollar} />
+          )}
+          {activeModule === 'geofences' && (
+            <GeofencePanel
+              zones={zones}
+              openAlertCounts={openAlertCounts}
+              visibleZoneIds={visibleZoneIds}
+              onToggleZone={toggleZone}
+              onToggleAll={toggleAllZones}
+            />
+          )}
+        </>
+      )}
 
       <SignalLostBanner collarIds={lostCollars} onDismiss={alerts.clearSignalLost} />
 

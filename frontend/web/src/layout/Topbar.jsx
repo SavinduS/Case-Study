@@ -1,15 +1,11 @@
-/**
- * Only Dashboard is implemented for this use case. The remaining tabs are
- * the other modules in the Group 033 design and are owned by the other
- * three members, so they render as disabled placeholders rather than
- * links that would dead-end on a redirect.
- */
+import { NavLink } from 'react-router-dom';
+
 const NAV = [
-  { key: 'dashboard', label: 'Dashboard', implemented: true },
-  { key: 'dataLogs', label: 'Data Logs', implemented: false },
-  { key: 'map', label: 'Map View', implemented: false },
-  { key: 'reports', label: 'Reports', implemented: false },
-  { key: 'admin', label: 'Admin', implemented: false }
+  { key: 'dashboard', label: 'Dashboard', to: '/', implemented: true },
+  { key: 'dataLogs', label: 'Data Logs', to: '/data-logs', implemented: false },
+  { key: 'map', label: 'Map View', to: '/map-view', implemented: false },
+  { key: 'reports', label: 'Reports', to: '/reports', implemented: false },
+  { key: 'admin', label: 'Admin', to: '/admin', implemented: false }
 ];
 
 /**
@@ -17,7 +13,7 @@ const NAV = [
  * band, two-line wordmark, tab navigation with an active pill, and the
  * signed-in Operations Officer on the right.
  */
-export default function Topbar({ active = 'dashboard' }) {
+export default function Topbar() {
   return (
     <header className="flex h-16 shrink-0 items-stretch bg-park-900 pr-4 text-white">
       <div className="flex w-56 shrink-0 items-center px-5">
@@ -30,26 +26,30 @@ export default function Topbar({ active = 'dashboard' }) {
         </span>
       </div>
 
-      <nav aria-label="Primary" className="flex items-stretch gap-1">
-        {NAV.map((item) => {
-          const isActive = item.key === active;
-          return (
-            <span
-              key={item.key}
-              aria-current={isActive ? 'page' : undefined}
-              title={item.implemented ? undefined : 'Not part of this use case'}
-              className={`flex items-center px-5 text-sm font-semibold transition-colors ${
+<nav aria-label="Primary" className="flex items-stretch gap-1">
+        {NAV.map((item) => (
+          <NavLink
+            key={item.key}
+            to={item.to}
+            end={item.to === '/'}
+            title={
+              item.implemented
+                ? undefined
+                : 'Owned by another use case in the group design'
+            }
+            className={({ isActive }) =>
+              `flex items-center px-5 text-sm font-semibold transition-colors ${
                 isActive
-                  ? 'cursor-default bg-sand-100 text-park-900 shadow-[inset_0_-4px_0_0_#0c2b21]'
+                  ? 'bg-sand-100 text-park-900 shadow-[inset_0_-4px_0_0_#0c2b21]'
                   : item.implemented
-                    ? 'cursor-pointer text-white/75 hover:bg-white/10 hover:text-white'
-                    : 'cursor-not-allowed text-white/30'
-              }`}
-            >
-              {item.label}
-            </span>
-          );
-        })}
+                    ? 'text-white/75 hover:bg-white/10 hover:text-white'
+                    : 'text-white/40 hover:bg-white/10 hover:text-white/80'
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="ml-auto flex items-center gap-3">

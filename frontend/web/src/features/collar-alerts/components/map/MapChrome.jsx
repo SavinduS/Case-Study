@@ -10,31 +10,23 @@ export function ClockChip({ time }) {
 }
 
 /**
- * Telemetry + boundary status chips. "Data Ingestion Active" mirrors the
- * storyboard frame where a transmission is being received.
+ * Telemetry and geofence status. Visibility of individual zones is now
+ * controlled from the Geofences panel, so this is a read-only indicator.
  */
-export function StatusChips({ signalLost = false, boundaryVisible = true, onToggleBoundary }) {
+export function StatusChips({ signalLost = false, visibleZoneCount = 0, totalZoneCount = 0 }) {
   return (
     <div className="pointer-events-none absolute right-[22.5rem] top-4 z-[700] flex flex-col items-end gap-2">
       <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow">
         <span className={`h-2 w-2 rounded-full ${signalLost ? 'bg-alert-600' : 'bg-moss-500'}`} />
         {signalLost ? 'Data Ingestion Interrupted' : 'Data Ingestion Active'}
       </span>
-      <button
-        type="button"
-        onClick={onToggleBoundary}
-        aria-pressed={boundaryVisible}
-        className="pointer-events-auto inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow
-          border transition-colors"
-        style={{
-          background: boundaryVisible ? '#d7263d' : '#ffffff',
-          color: boundaryVisible ? '#ffffff' : '#b91c1c',
-          borderColor: '#d7263d'
-        }}
+      <span
+        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow"
+        style={{ background: visibleZoneCount > 0 ? '#d7263d' : '#ffffff', color: visibleZoneCount > 0 ? '#ffffff' : '#b91c1c' }}
       >
         <span className="h-2 w-2 rounded-full bg-current" />
-        High-Risk Boundary
-      </button>
+        {visibleZoneCount} of {totalZoneCount} geofences shown
+      </span>
     </div>
   );
 }

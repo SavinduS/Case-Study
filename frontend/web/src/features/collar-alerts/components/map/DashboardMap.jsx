@@ -69,7 +69,7 @@ function ensureHatchPattern(map) {
  * ranger deployments. Imperative handle drives the map control stack.
  */
 const DashboardMap = forwardRef(function DashboardMap(
-  { collars, zones, rangerTeams, settlements, openAlerts, onSelectCollar, onToggleBoundary, boundaryVisible = true },
+  { collars, zones, totalZoneCount, rangerTeams, settlements, openAlerts, onSelectCollar },
   ref
 ) {
   const containerRef = useRef(null);
@@ -169,15 +169,15 @@ const DashboardMap = forwardRef(function DashboardMap(
         dashArray: '6 4',
         fill: true,
         fillColor: zone.threatLevel === THREAT_LEVEL.CRITICAL ? '#d7263d' : '#e9a23b',
-        fillOpacity: boundaryVisible ? 1 : 0,
-        className: boundaryVisible ? 'geofence-zone' : ''
+        fillOpacity: 1,
+        className: 'geofence-zone'
       })
         .addTo(map)
         .bindTooltip(`${zone.name} (${zone.gridRef})`, { sticky: true })
     );
 
     return () => layers.forEach((layer) => map.removeLayer(layer));
-  }, [ready, zones, boundaryVisible]);
+  }, [ready, zones]);
 
   // Settlements justify the threat escalation shown in the alert modal.
   useEffect(() => {
@@ -285,11 +285,11 @@ const DashboardMap = forwardRef(function DashboardMap(
       <ClockChip time={clock} />
       <StatusChips
         signalLost={collars.some((collar) => collar.status === 'signal_lost')}
-        boundaryVisible={boundaryVisible}
-        onToggleBoundary={onToggleBoundary}
+        visibleZoneCount={zones.length}
+        totalZoneCount={totalZoneCount ?? zones.length}
       />
       <ControlStack onAction={onControl} />
-      {boundaryVisible && <MapLegend zones={zones} />}
+      <MapLegend zones={zones} />
     </div>
   );
 });

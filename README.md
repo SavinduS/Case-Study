@@ -24,7 +24,8 @@ npm run dev      # http://localhost:5173
 ```
 src/
   layout/                      Topbar + module rail
-  components/ui/               Button, Badge, Modal primitives
+  components/ui/               Button, Badge, Modal, ModulePlaceholder
+  pages/PortalModuleRoute.jsx  Placeholder route for other members' modules
   features/collar-alerts/
     data/parkData.js           Park boundary, geofences, collars, rangers
     domain/geo.js              Haversine, point-in-polygon, distance-to-edge
@@ -35,8 +36,22 @@ src/
     hooks/useCollarAlerts.js   Controller: ingest -> evaluate -> queue -> audit
     components/map/            Leaflet map, markers, legend, map chrome
     components/alerts/         Critical alert modal, queue, dialogs, drawer
+    components/panels/         Collar registry + geofence register
     pages/DashboardPage.jsx    Screen composition
 ```
+
+### Navigation
+
+The module rail and top navigation are both live.
+
+| Control | Behaviour |
+| --- | --- |
+| Rail: Tracked collars | Collar registry — status, device, battery, health, risk, last fix |
+| Rail: Active alerts | Prioritised alert queue (default panel) |
+| Rail: Geofences | Geofence register with per-zone show/hide on the map |
+| Rail: Incidents, Patrols, Camera traps, Reports, Settings | Placeholder naming the owning member |
+| Nav: Dashboard | This use case |
+| Nav: Data Logs, Map View, Reports, Admin | Placeholder route naming the owning member |
 
 ### Use case coverage
 
