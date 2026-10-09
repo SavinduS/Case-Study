@@ -135,12 +135,14 @@ export default function SubmitReportScreen({
           onChange={onPhotoChange}
         />
 
-        <PrimaryButton
-          label="Submit Report"
-          onPress={handleSubmit}
-          loading={submitting}
-          disabled={submitting}
-        />
+        <View style={styles.submitBlock}>
+          <PrimaryButton
+            label="Submit Report"
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={submitting}
+          />
+        </View>
         <Text style={styles.footnote}>
           Your report will be confirmed after it is received by the system.
         </Text>
@@ -166,6 +168,9 @@ const styles = StyleSheet.create({
   },
   titleText: {
     flex: 1
+  },
+  submitBlock: {
+    marginTop: spacing.lg
   },
   appName: {
     color: colors.primary,
