@@ -106,8 +106,8 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
       .filter(Boolean)
       .join('  ·  ');
 
-    return (
-      <View style={styles.row}>
+    const content = (
+      <>
         <View style={styles.rowHeader}>
           <Text style={styles.type}>{label}</Text>
           <View style={[styles.badge, pending ? styles.badgePending : styles.badgeReceived]}>
@@ -144,7 +144,22 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
             renderLiveLine(item.reportId)
           )}
         </View>
-      </View>
+      </>
+    );
+
+    if (pending) {
+      return <View style={styles.row}>{content}</View>;
+    }
+
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Check live status on the server"
+        onPress={() => void checkStatus(item)}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        {content}
+      </Pressable>
     );
   }
 
