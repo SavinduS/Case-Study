@@ -179,7 +179,8 @@ describe('POST /api/conflict-reports/sync (FR-13, FR-14)', () => {
           location: { coordinates: [81.52, 6.5] },
           clientRefId: 'offline-2'
         },
-        { incidentType: 'crop_damage', clientRefId: 'offline-3' } // no location
+        { incidentType: 'crop_damage', clientRefId: 'offline-3' }, // no location
+        { ...validReport, location: { coordinates: [0, 0] }, clientRefId: 'offline-4' } // outside area
       ]
     };
 
@@ -190,6 +191,9 @@ describe('POST /api/conflict-reports/sync (FR-13, FR-14)', () => {
     expect(res.body.results[0].reportId).toMatch(/^CR-\d{4}-\d{6}$/);
     expect(res.body.results[2].ok).toBe(false);
     expect(res.body.results[2].errors.location).toBeDefined();
+    expect(res.body.results[2].message).toBe('Validation failed');
+    expect(res.body.results[3].ok).toBe(false);
+    expect(res.body.results[3].message).toMatch(/outside/i);
 
     const retry = await request(app)
       .post('/api/conflict-reports/sync')
@@ -207,6 +211,7 @@ describe('POST /api/conflict-reports/sync (FR-13, FR-14)', () => {
       .send({ reports: [{ ...validReport }] });
     expect(res.body.results[0].ok).toBe(false);
     expect(res.body.results[0].errors.clientRefId).toBeDefined();
+    expect(res.body.results[0].message).toBe('clientRefId is required for sync');
   });
 });
 
