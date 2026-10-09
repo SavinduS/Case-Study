@@ -2,11 +2,22 @@
   "name": "wildlife-conservation",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["backend", "frontend/*"],
+  "workspaces": [
+    "backend",
+    "frontend/*"
+  ],
+  "overrides": {
+    "test-renderer": "1.2.0"
+  },
   "scripts": {
     "backend": "npm run dev -w backend",
     "mobile": "npm run start -w frontend/mobile",
     "web": "npm run dev -w frontend/web",
-    "test": "npm run test -w backend"
+    "test": "npm run test -w backend",
+    "test:mobile": "npm run test -w frontend/mobile"
+  },
+  "devDependencies": {
+    "react": "19.2.3",
+    "test-renderer": "1.2.0"
   }
 }
