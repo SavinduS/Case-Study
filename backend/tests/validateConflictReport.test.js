@@ -74,4 +74,27 @@ describe('validateConflictReport', () => {
     expect(result.value.locationText).toBe('North');
     expect(result.value.photoUrl).toBe('/uploads/a.jpg');
   });
+
+  test('locationText and photoUrl must be strings when provided', () => {
+    const result = validateConflictReport({ ...valid, locationText: 42, photoUrl: { url: 'x' } }, {});
+    expect(result.ok).toBe(false);
+    expect(result.errors.locationText).toBeDefined();
+    expect(result.errors.photoUrl).toBeDefined();
+  });
+
+  test('app reports may include a contact but it must look like a phone number', () => {
+    const bad = validateConflictReport({ ...valid, reporterContact: '12' }, { method: 'app' });
+    expect(bad.ok).toBe(false);
+    expect(bad.errors.reporterContact).toBeDefined();
+
+    const good = validateConflictReport({ ...valid, reporterContact: '+94771234567' }, { method: 'app' });
+    expect(good.ok).toBe(true);
+    expect(good.value.reporterContact).toBe('+94771234567');
+  });
+
+  test('non-string description is rejected', () => {
+    const result = validateConflictReport({ ...valid, description: 12345 }, {});
+    expect(result.ok).toBe(false);
+    expect(result.errors.description).toBeDefined();
+  });
 });

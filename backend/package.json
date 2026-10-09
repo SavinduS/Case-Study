@@ -8,7 +8,25 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": ["<rootDir>/tests/**/*.test.js"],
-    "setupFiles": ["<rootDir>/tests/setupEnv.js"]
+    "setupFiles": ["<rootDir>/tests/setupEnv.js"],
+    "collectCoverageFrom": [
+      "app.js",
+      "controllers/**/*.js",
+      "middlewares/**/*.js",
+      "models/**/*.js",
+      "routes/**/*.js",
+      "utils/**/*.js",
+      "config/**/*.js",
+      "!**/node_modules/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 80,
+        "functions": 80,
+        "lines": 80
+      }
+    }
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
