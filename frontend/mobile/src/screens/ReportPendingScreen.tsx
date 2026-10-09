@@ -22,7 +22,7 @@ export default function ReportPendingScreen({ localRef, onDone }: Props) {
         <StatusBanner
           tone="offline"
           title="Offline — report saved on this device, waiting to send."
-          message="Report saved. It will be submitted automatically when connectivity returns. If the phone is online but it still will not send, check EXPO_PUBLIC_API_BASE_URL in frontend/mobile/.env — open My Reports to see the server connection status."
+          message="Report saved. It will be submitted automatically when connectivity returns. If the phone is online but it still will not send, open My Reports to see which server address was tried."
         />
 
         <Text style={styles.fieldLabel}>Local reference</Text>

@@ -3,4 +3,20 @@ const config = require('./config');
 const connectDB = require('./config/db');
 
 connectDB().catch(console.error);
-app.listen(config.port, () => console.log(`API on :${config.port}`));
+
+// Listen on the configured port (5000 by default); if it is already busy,
+// retry once on the next port (5001) — the mobile client probes both.
+function listen(port, allowRetry = true) {
+  const server = app.listen(port, () => console.log(`API on :${port}`));
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && allowRetry) {
+      console.log(`Port ${port} is busy — retrying on ${port + 1}`);
+      listen(port + 1, false);
+    } else {
+      console.error(err);
+      process.exit(1);
+    }
+  });
+}
+
+listen(config.port);

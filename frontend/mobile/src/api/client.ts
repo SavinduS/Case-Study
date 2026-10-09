@@ -1,9 +1,13 @@
-import { API_BASE_URL } from '../config';
 import type {
   ConflictReportConfirmation,
   ReportSubmission,
   SyncResponse
 } from '../types';
+import { getActiveBaseUrl, getBaseUrl, invalidateBaseUrl, probeServer } from './baseUrl';
+
+// All requests give up after 20 seconds and treat that as "cannot reach the
+// server" (reports are then kept on the device and retried later).
+const REQUEST_TIMEOUT_MS = 20_000;
 
 export class ApiError extends Error {
   status: number;
@@ -18,25 +22,11 @@ export class ApiError extends Error {
 }
 
 export class NetworkError extends Error {
-  constructor(
-    message = `Cannot reach the server at ${API_BASE_URL}. Check EXPO_PUBLIC_API_BASE_URL in frontend/mobile/.env and allow Node.js through the Windows firewall.`
-  ) {
-    super(message);
+  constructor(base?: string) {
+    super(
+      `Cannot reach the server at ${base ?? getActiveBaseUrl()}. It is chosen automatically (Metro host, port 5000/5001, Android emulator, LAN) — check that the backend is running and the Windows firewall allows Node.js.`
+    );
     this.name = 'NetworkError';
-  }
-}
-
-// Cheap reachability probe for the My Reports banner ("is the server there?")
-export async function pingServer(timeoutMs = 4000): Promise<boolean> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -45,11 +35,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   if (!isForm && options.body !== undefined) headers['Content-Type'] = 'application/json';
 
+  const base = await getBaseUrl();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    res = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
   } catch {
-    throw new NetworkError();
+    invalidateBaseUrl(base);
+    throw new NetworkError(base);
+  } finally {
+    clearTimeout(timer);
   }
 
   let payload: Record<string, unknown> = {};
@@ -60,6 +57,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) throw new ApiError(res.status, payload);
   return payload as T;
+}
+
+// Reachability check for the My Reports banner
+export async function pingServer(): Promise<{ reachable: boolean; base: string }> {
+  const { reachable, base } = await probeServer();
+  return { reachable, base };
 }
 
 export function createReport(body: ReportSubmission): Promise<ConflictReportConfirmation> {
