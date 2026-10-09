@@ -1,7 +1,12 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // Lets the F1 validator/tests use explicit `.ts` import extensions, which
+    // plain `node --test` (type-stripping) needs. Types-only; no runtime effect.
+    "allowImportingTsExtensions": true,
+    // Makes `node:test` / `node:assert` visible to `tsc` for the F1 unit tests.
+    "types": ["node"]
   },
   "include": ["index.js", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]

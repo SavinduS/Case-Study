@@ -78,6 +78,11 @@ export const setGeofenceEnabled = (zoneId, enabled) =>
 export const reportSignalLost = (collarId, lost = true, reason) =>
   request(`/telemetry/collars/${collarId}/signal`, { method: 'PUT', body: { lost, reason } });
 
+/** Field incidents (ranger offline flow). `body.clientId` is the device-made
+ * idempotency key the offline queue attaches — see src/offline/syncQueue.js. */
+export const createIncident = (body) => request('/incidents', { method: 'POST', body });
+export const getMyIncidents = () => request('/incidents/mine');
+
 // Analytics workspace contract. Kept alongside the shared client so feature
 // pages and consumers can use one API surface.
 export const getAnalyticsReport = (criteria) =>
