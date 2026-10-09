@@ -2,11 +2,18 @@
   "name": "wildlife-conservation",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["backend", "frontend/*"],
+  "workspaces": [
+    "backend",
+    "frontend/*"
+  ],
   "scripts": {
+    "dev": "npm run backend & npm run web & wait",
     "backend": "npm run dev -w backend",
-    "mobile": "npm run start -w frontend/mobile",
     "web": "npm run dev -w frontend/web",
-    "test": "npm run test -w backend"
+    "mobile": "npm run start -w frontend/mobile",
+    "seed": "npm run seed -w backend",
+    "seed:reset": "npm run seed:reset -w backend",
+    "test": "npm run test -w backend",
+    "test:web": "npm run test -w frontend/web"
   }
 }

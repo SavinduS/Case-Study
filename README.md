@@ -13,29 +13,44 @@ breaches on the server, and dispatches a ranger response.
 
 ### Run it
 
-```bash
-# 1. API (reads MONGODB_URI from backend/.env)
-cd backend
-npm install
-npm run seed          # park, geofences, collars, ranger teams
-npm run dev           # http://localhost:5055
+The repo is an **npm workspace** (`backend`, `frontend/mobile`, `frontend/web`).
+Install once from the repository root — there is a single `package-lock.json`
+there, so do not run `npm install` inside a package folder.
 
-# 2. Dashboard
-cd ../frontend/web
-npm install
-npm run dev           # http://localhost:5173
+```bash
+cd <repo root>
+npm install          # once, from the root
+npm run seed         # park, geofences, collars, ranger teams (safe to re-run)
+npm run dev          # starts the API and the dashboard together
 ```
 
-Vite proxies `/api` to `http://localhost:5055`, so the browser stays on one
-origin and no API base URL is baked into the bundle.
+Then open **http://localhost:5173**.
 
-Useful commands:
+`npm run dev` starts both processes, so the dashboard is not stuck on
+"Cannot reach the API". To run them separately instead, use two terminals:
+
+```bash
+npm run backend      # API on :5055
+npm run web          # dashboard on :5173
+```
+
+**Both are required.** The dashboard only renders a map once the API answers;
+it polls `/api`, and Vite proxies that to the backend so the browser stays on
+one origin with no CORS setup and no base URL in the bundle.
 
 | Command | Effect |
 | --- | --- |
+| `npm run dev` | API + dashboard together |
+| `npm run backend` / `npm run web` | Run either one on its own |
 | `npm run seed` | Upsert reference data (safe to re-run) |
 | `npm run seed:reset` | Clear alerts/audit/dispatches and restore collar positions |
-| `TELEMETRY_SIMULATOR=false npm run dev` | Stop the server generating collar telemetry |
+| `npm run test` | Backend: Jest (conflict reports) then Vitest (collar alerts) |
+| `npm run test:web` | Frontend Vitest suite |
+| `TELEMETRY_SIMULATOR=false npm run backend` | Stop the server generating collar telemetry |
+
+If the dashboard shows a red **Cannot reach the API** banner, the API is not
+running (or is on a different port than `backend/.env` sets) — start
+`npm run backend`. Use **Reset** on the banner to retry.
 
 ### Where the code lives
 
