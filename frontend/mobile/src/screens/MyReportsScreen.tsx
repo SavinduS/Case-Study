@@ -183,7 +183,7 @@ export default function MyReportsScreen({ onBack, onRefreshReports }: Props) {
           <StatusBanner
             tone="error"
             title="Server NOT reachable"
-            message={`Tried ${server.base} (and the Metro host, ports 5000/5001, 10.0.2.2, LAN fallback). Check that the backend is running and the Windows firewall allows Node.js. Reports stay on this device until the server is reachable.`}
+            message={`Tried ${server.base} (and the Metro host, ports 5000/5001, 10.0.2.2). Check that the backend is running and the Windows firewall allows Node.js. Reports stay on this device until the server is reachable.`}
           />
         )}
       </View>
