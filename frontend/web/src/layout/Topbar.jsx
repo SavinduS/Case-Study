@@ -1,9 +1,15 @@
+/**
+ * Only Dashboard is implemented for this use case. The remaining tabs are
+ * the other modules in the Group 033 design and are owned by the other
+ * three members, so they render as disabled placeholders rather than
+ * links that would dead-end on a redirect.
+ */
 const NAV = [
-  { key: 'dashboard', label: 'Dashboard', to: '/' },
-  { key: 'dataLogs', label: 'Data Logs', to: '/data-logs' },
-  { key: 'map', label: 'Map View', to: '/map-view' },
-  { key: 'reports', label: '/reports', to: '/reports' },
-  { key: 'admin', label: 'Admin', to: '/admin' }
+  { key: 'dashboard', label: 'Dashboard', implemented: true },
+  { key: 'dataLogs', label: 'Data Logs', implemented: false },
+  { key: 'map', label: 'Map View', implemented: false },
+  { key: 'reports', label: 'Reports', implemented: false },
+  { key: 'admin', label: 'Admin', implemented: false }
 ];
 
 /**
@@ -28,18 +34,20 @@ export default function Topbar({ active = 'dashboard' }) {
         {NAV.map((item) => {
           const isActive = item.key === active;
           return (
-            <a
+            <span
               key={item.key}
-              href={item.to}
               aria-current={isActive ? 'page' : undefined}
+              title={item.implemented ? undefined : 'Not part of this use case'}
               className={`flex items-center px-5 text-sm font-semibold transition-colors ${
                 isActive
-                  ? 'bg-sand-100 text-park-900 shadow-[inset_0_-4px_0_0_#0c2b21]'
-                  : 'text-white/75 hover:bg-white/10 hover:text-white'
+                  ? 'cursor-default bg-sand-100 text-park-900 shadow-[inset_0_-4px_0_0_#0c2b21]'
+                  : item.implemented
+                    ? 'cursor-pointer text-white/75 hover:bg-white/10 hover:text-white'
+                    : 'cursor-not-allowed text-white/30'
               }`}
             >
               {item.label}
-            </a>
+            </span>
           );
         })}
       </nav>
