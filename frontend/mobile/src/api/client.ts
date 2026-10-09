@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import type {
   ConflictReportConfirmation,
   ReportSubmission,
@@ -38,11 +39,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const base = await getBaseUrl();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const method = options.method ?? 'GET';
+  const url = `${base}${path}`;
+  // Phone-side trace — appears in the Metro terminal
+  console.log(`[api] → ${method} ${url}`);
 
   let res: Response;
   try {
-    res = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
-  } catch {
+    res = await fetch(url, { ...options, headers, signal: controller.signal });
+    console.log(`[api] ${res.ok ? '✓' : '!'} ${res.status} ${method} ${url}`);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.log(`[api] ✗ ${method} ${url} — ${reason}`);
     invalidateBaseUrl(base);
     throw new NetworkError(base);
   } finally {
@@ -89,11 +97,11 @@ export async function uploadPhoto(localUri: string): Promise<string> {
   const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : 'jpg';
   const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const form = new FormData();
+  const file = new File(localUri);
   form.append('photo', {
-    uri: localUri,
     name: name.includes('.') ? name : 'photo.jpg',
-    type
-    // React Native file object shape (not part of the DOM FormData type)
+    type,
+    bytes: async () => new Uint8Array(await file.bytes())
   } as unknown as Blob);
 
   const data = await request<{ photoUrl: string }>('/api/conflict-reports/photo', {
