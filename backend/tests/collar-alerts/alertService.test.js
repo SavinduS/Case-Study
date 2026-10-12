@@ -36,6 +36,7 @@ const hoisted = {
   parkFindOne: vi.fn(),
   attemptCreate: vi.fn(),
   attemptUpdateMany: vi.fn(),
+  attemptCountDocuments: vi.fn(),
   geofenceFind: vi.fn(),
   nextSequence: vi.fn()
 };
@@ -50,7 +51,11 @@ Object.assign(models.BoundaryAlert, {
 Object.assign(models.AuditEntry, { create: hoisted.auditCreate });
 Object.assign(models.RangerTeam, { find: hoisted.rangerFind, updateOne: hoisted.rangerUpdateOne });
 Object.assign(models.Park, { findOne: hoisted.parkFindOne });
-Object.assign(models.DispatchAttempt, { create: hoisted.attemptCreate, updateMany: hoisted.attemptUpdateMany });
+Object.assign(models.DispatchAttempt, {
+  create: hoisted.attemptCreate,
+  updateMany: hoisted.attemptUpdateMany,
+  countDocuments: hoisted.attemptCountDocuments
+});
 Object.assign(models.Counter, { nextSequence: hoisted.nextSequence });
 Object.assign(models.Geofence, { find: hoisted.geofenceFind });
 
@@ -118,6 +123,8 @@ beforeEach(() => {
   hoisted.auditCreate.mockResolvedValue({});
   hoisted.attemptCreate.mockResolvedValue({});
   hoisted.attemptUpdateMany.mockResolvedValue({});
+  // No attempts logged yet unless a test says otherwise.
+  hoisted.attemptCountDocuments.mockResolvedValue(0);
   hoisted.alertCreate.mockImplementation((doc) => Promise.resolve(doc));
   hoisted.collarSave.mockResolvedValue(undefined);
 });
@@ -394,7 +401,7 @@ describe('sendDispatch', () => {
     expect(outcome.attempts).toBe(3);
     expect(deliver).toHaveBeenCalledTimes(3);
     expect(hoisted.attemptUpdateMany).toHaveBeenCalledWith(
-      { alertId: alert.alertId },
+      { alertId: alert.alertId, attempt: { $gt: 0 } },
       { $set: { state: DISPATCH_STATE.FAILED } }
     );
   });
@@ -407,6 +414,22 @@ describe('sendDispatch', () => {
     const outcome = await alertService.sendDispatch(alert, ranger, { deliver });
 
     expect(outcome).toEqual({ delivered: true, attempts: 3 });
+  });
+
+  it('numbers attempts from where the alert already is, so a re-task is unambiguous', async () => {
+    hoisted.attemptCountDocuments.mockResolvedValue(3);
+
+    const outcome = await alertService.sendDispatch({ alertId: 'CBA-2026-0001' }, ranger, {
+      deliver: async () => false
+    });
+
+    expect(hoisted.attemptCreate.mock.calls.map(([doc]) => doc.attempt)).toEqual([4, 5, 6]);
+    expect(outcome.attempts).toBe(6);
+    // Only this round is flipped to failed; an earlier delivered round stays.
+    expect(hoisted.attemptUpdateMany).toHaveBeenCalledWith(
+      { alertId: 'CBA-2026-0001', attempt: { $gt: 3 } },
+      { $set: { state: 'failed' } }
+    );
   });
 
   it('records the ranger on every attempt', async () => {

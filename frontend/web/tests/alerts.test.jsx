@@ -275,7 +275,29 @@ describe('ActiveAlertsPanel', () => {
         onSelect={vi.fn()}
       />
     );
-    expect(screen.getByText('Failed delivery')).toBeInTheDocument();
+    expect(screen.getByText(/Failed delivery — contact by radio/i)).toBeInTheDocument();
+  });
+
+  it('confirms a dispatch that the ranger unit actually accepted', () => {
+    render(
+      <ActiveAlertsPanel
+        alerts={[{
+          ...ALERT,
+          status: ALERT_STATUS.ACKNOWLEDGED,
+          dispatchState: 'delivered',
+          dispatchedTo: 'Ranger Team Matale'
+        }]}
+        openCount={1}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Delivered')).toBeInTheDocument();
+    expect(screen.getByText('Ranger Team Matale')).toBeInTheDocument();
+  });
+
+  it('shows the alert reference the officer quotes over the radio', () => {
+    render(<ActiveAlertsPanel alerts={[ALERT]} openCount={1} onSelect={vi.fn()} />);
+    expect(screen.getByText(ALERT.alertId)).toBeInTheDocument();
   });
 });
 

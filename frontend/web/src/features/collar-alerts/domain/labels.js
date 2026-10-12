@@ -43,6 +43,7 @@ export const RESPONSE_ACTION = {
 
 export const AUDIT_TAB = {
   DELAYED: 'delayed',
+  DISPATCH: 'dispatch',
   AUDIT: 'audit'
 };
 

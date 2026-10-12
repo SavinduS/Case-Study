@@ -7,7 +7,9 @@ function readToken(req) {
 }
 
 function toUser(payload) {
-  return { id: payload.sub, role: payload.role };
+  // `name` is a claim added alongside the audit-trail work. Tokens minted
+  // before it existed simply have no name, so callers must fall back to `id`.
+  return { id: payload.sub, role: payload.role, name: payload.name ?? null };
 }
 
 // Required authentication: 401 when missing/invalid token

@@ -12,13 +12,20 @@ const { AUDIT_ACTION } = require('../utils/collarAlertConstants');
  *
  *   { "fixes": [{ "collarId": "E-402", "coordinates": [81.03, 8.24], "at": "..." }],
  *     "delayed": false }
+ *
+ * Responds 201 with a per-fix outcome: `alerts` lists what was created and
+ * `rejected` says which fixes were refused and why, so a partially bad batch is
+ * never reported as a clean ingest.
  */
 async function ingestFixes(req, res, next) {
   try {
-    const { fixes, delayed = false } = req.body;
+    const { fixes, delayed = false } = req.body ?? {};
 
     if (!Array.isArray(fixes) || fixes.length === 0) {
       return res.status(400).json({ message: 'Body must include a non-empty fixes array' });
+    }
+    if (typeof delayed !== 'boolean') {
+      return res.status(400).json({ message: 'delayed must be a boolean' });
     }
 
     const result = await ingestBatch(fixes, { delayed });
@@ -33,7 +40,8 @@ async function ingestFixes(req, res, next) {
         status: alert.status,
         detectedAt: alert.detectedAt
       })),
-      rejected: result.rejected
+      rejected: result.rejected,
+      zonesConsidered: result.zonesConsidered
     });
   } catch (e) { next(e); }
 }
@@ -43,7 +51,11 @@ async function reportSignalLost(req, res, next) {
   try {
     const Collar = require('../models/Collar');
     const { collarId } = req.params;
-    const { lost = true, reason = 'Gateway heartbeat timeout' } = req.body;
+    const { lost = true, reason = 'Gateway heartbeat timeout' } = req.body ?? {};
+
+    if (typeof lost !== 'boolean') {
+      return res.status(400).json({ message: 'lost must be a boolean' });
+    }
 
     const collar = await Collar.findOneAndUpdate(
       { collarId },

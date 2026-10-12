@@ -139,15 +139,21 @@ export default function ActiveAlertsPanel({ alerts, openCount, onSelect, selecte
                   {alert.species} · {alert.zoneName} · {alert.gridRef}
                 </p>
 
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Badge tone={ALERT_STATUS_TONE[alert.status]} size="sm">
                     {ALERT_STATUS_LABEL[alert.status]}
                   </Badge>
+                  <span className="font-mono text-[10px] text-stone-400">{alert.alertId}</span>
                   {alert.dispatchedTo && (
                     <span className="truncate text-[11px] text-stone-500">{alert.dispatchedTo}</span>
                   )}
+                  {alert.dispatchState === 'delivered' && (
+                    <span className="text-[11px] font-semibold text-moss-500">Delivered</span>
+                  )}
                   {alert.dispatchState === 'failed' && (
-                    <span className="text-[11px] font-semibold text-alert-600">Failed delivery</span>
+                    <span className="text-[11px] font-semibold text-alert-600">
+                      Failed delivery — contact by radio
+                    </span>
                   )}
                 </div>
               </button>

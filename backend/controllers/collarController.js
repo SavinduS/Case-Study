@@ -21,12 +21,29 @@ async function getCollar(req, res, next) {
 
 async function registerCollar(req, res, next) {
   try {
-    const exists = await Collar.findOne({ collarId: req.body.collarId });
+    const { collarId, gpsDeviceId, species, ...rest } = req.body ?? {};
+    if (!collarId || !gpsDeviceId || !species) {
+      return res.status(400).json({ message: 'collarId, gpsDeviceId and species are required' });
+    }
+    const exists = await Collar.findOne({ collarId });
     if (exists) return res.status(409).json({ message: 'Collar already registered' });
-    const collar = await Collar.create(req.body);
+    // Built field by field rather than passing req.body straight through, so a
+    // caller cannot set fields the registry does not own (e.g. a forged
+    // lastFixAt that would make a fresh collar look stale).
+    const collar = await Collar.create({
+      collarId,
+      gpsDeviceId,
+      species,
+      sex: rest.sex,
+      health: rest.health,
+      speciesRisk: rest.speciesRisk,
+      batteryLevel: rest.batteryLevel,
+      riskLevel: rest.riskLevel,
+      lastKnownLocation: rest.lastKnownLocation
+    });
     await writeAudit({
       action: AUDIT_ACTION.COLLAR_REGISTERED,
-      actor: 'admin',
+      actor: req.user?.name || req.user?.id || 'officer',
       detail: `Collar ${collar.collarId} registered (${collar.species}).`
     });
     res.status(201).json(collar);
@@ -36,7 +53,12 @@ async function registerCollar(req, res, next) {
 // PUT /api/collars/:collarId/status - used by the gateway to flag signal loss.
 async function updateCollarStatus(req, res, next) {
   try {
-    const { status } = req.body;
+    const { status } = req.body ?? {};
+    if (!Object.values(COLLAR_STATUS).includes(status)) {
+      return res.status(400).json({
+        message: `status must be one of: ${Object.values(COLLAR_STATUS).join(', ')}`
+      });
+    }
     const collar = await Collar.findOneAndUpdate(
       { collarId: req.params.collarId },
       { $set: { status } },
