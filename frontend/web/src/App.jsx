@@ -6,7 +6,9 @@ import DashboardPage from './features/collar-alerts/pages/DashboardPage.jsx';
 import TriagePage from './features/field-incidents/pages/TriagePage.jsx';
 import ReportsPage from './features/reports/pages/ReportsPage.jsx';
 import SavedReportsPage from './features/reports/pages/SavedReportsPage.jsx';
+import ZoneSettingsPage from './features/reports/pages/ZoneSettingsPage.jsx';
 import AnalyticsShell from './features/reports/components/AnalyticsShell.jsx';
+
 import ComparisonPage from './features/reports/pages/ComparisonPage.jsx';
 import VillagerReportsPage from './features/villager-reports/pages/VillagerReportsPage.jsx';
 import useVillagerReports from './features/villager-reports/hooks/useVillagerReports.js';
@@ -105,7 +107,9 @@ export default function App() {
             <Route path="/analytics/type" element={<ReportsPage />} />
             <Route path="/analytics/comparison" element={<ComparisonPage />} />
             <Route path="/analytics/saved" element={<SavedReportsPage />} />
+            <Route path="/analytics/zones" element={<ZoneSettingsPage />} />
             <Route path="*" element={home} />
+
           </Routes>
         </AnalyticsShell>
       ) : (

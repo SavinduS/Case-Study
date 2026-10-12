@@ -41,14 +41,23 @@ function normalizeReport(report) {
   const zones = zoneCodes.map((code) => {
     const coverage = coverageMap[code] || {};
     const incidents = Number(density[code] || 0);
-    const coveragePercent = coverage.coveragePercent == null ? 0 : Number(coverage.coveragePercent);
+    const raw = coverage.coveragePercent;
+    const coveragePercent = raw == null || raw === '' ? null : Number(raw);
+    const hasCoverage = coveragePercent != null && Number.isFinite(coveragePercent);
+    // Incident nathnam risk na - coverage adu unath zone eka flag karanne na.
+    // required hours not configured (null) nam coverage unknown - incidents witharai risk decide karanna.
+    const risk = incidents === 0
+      ? 'Low'
+      : hasCoverage
+        ? (incidents >= 10 || coveragePercent < 50 ? 'High' : incidents >= 5 || coveragePercent < 80 ? 'Medium' : 'Low')
+        : (incidents >= 10 ? 'High' : incidents >= 5 ? 'Medium' : 'Low');
     return {
       code,
       name: ZONE_LABELS[code] || code,
       incidents,
       patrols: Number(coverage.actualHours || 0),
-      risk: incidents >= 10 || coveragePercent < 50 ? 'High' : incidents >= 5 || coveragePercent < 80 ? 'Medium' : 'Low',
-      value: coveragePercent
+      risk,
+      value: hasCoverage ? coveragePercent : null
     };
   });
   const trend = Object.entries(trendMap).map(([label, value]) => ({ label, value: Number(value) }));
@@ -72,7 +81,7 @@ function normalizeReport(report) {
     trendDirection: report?.trendDirection || summary.trendDirection || report?.terrainTrend?.direction || null,
     kpis: {
       incidents: Number(summary.incidentCount || 0),
-      patrolCoverage: required ? Number(((actual / required) * 100).toFixed(1)) : 0,
+      patrolCoverage: required ? Number(((actual / required) * 100).toFixed(1)) : null,
       hotspots: zones.filter((zone) => zone.risk === 'High').length,
       responseTime: null
     },
@@ -101,6 +110,9 @@ export const getReport = async (criteria) => {
   };
 };
 export const getSavedReports = () => request('/analytics/reports');
+export const getZoneSettings = () => request('/analytics/zone-settings');
+export const saveZoneSettings = (settings) =>
+  request('/analytics/zone-settings', { method: 'PUT', body: { settings } });
 export const getZoneRecords = (code, startDate, endDate) =>
   request(`/analytics/zones/${encodeURIComponent(code)}/records?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
 // Generation persists a report on the API; this alias keeps the feature API

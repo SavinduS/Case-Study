@@ -60,6 +60,7 @@ app.use('/api', (req, res, next) => {
 });
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/incidents', require('./routes/incidents'));
+app.use('/api/patrols', require('./routes/patrols'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/conflict-reports', require('./routes/conflictReports'));
 
