@@ -16,10 +16,15 @@ const HANDOFF_ATTEMPTS = 4;
  *  - opened in the mobile app's WebView: the app writes the session into
  *    localStorage before the page loads. If it has not landed yet, ask the app
  *    for it and wait briefly rather than flashing the sign-in page.
+ *
+ * The session is read during render rather than kept in state: a sign-in
+ * stores it and then navigates, and the guard checks the session in that very
+ * next render. State set from an effect would arrive a render too late, and
+ * the guard would bounce straight back to /login.
  */
 export function usePortalSession() {
-  const [session, setSession] = useState(() => readSession());
-  const [waiting, setWaiting] = useState(() => readSession() === null && isEmbedded());
+  const session = readSession();
+  const [waiting, setWaiting] = useState(() => session === null && isEmbedded());
 
   useEffect(() => {
     if (session || !isEmbedded() || !waiting) return undefined;
@@ -27,9 +32,8 @@ export function usePortalSession() {
     let attempts = 0;
     const timer = setInterval(() => {
       attempts += 1;
-      const current = readSession();
-      if (current) {
-        setSession(current);
+      if (readSession()) {
+        // Stop waiting; the next render picks the session up.
         setWaiting(false);
       } else if (attempts >= HANDOFF_ATTEMPTS) {
         // The app has nothing for us either.

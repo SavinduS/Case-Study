@@ -10,7 +10,7 @@ import SavedReportsPage from './features/reports/pages/SavedReportsPage.jsx';
 import ManagerShell from './features/reports/components/ManagerShell.jsx';
 import ComparisonPage from './features/reports/pages/ComparisonPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
-import { DASHBOARD_ROLES } from './services/session.js';
+import { DASHBOARD_ROLES, homePathForRole } from './services/session.js';
 
 /**
  * Operations dashboard shell for the Wildlife Conservation Portal.
@@ -42,6 +42,15 @@ export default function App() {
     return <Navigate to="/login" replace />;
   }
 
+  // The Park Manager works in the analytics workspace, so any other URL —
+  // including "/" — sends them there instead of the collar alert dashboard.
+  if (session.role === 'manager' && !isManagerWorkspace) {
+    return <Navigate to={homePathForRole(session.role)} replace />;
+  }
+
+  // An unknown URL returns each role to its own home, not everyone to "/".
+  const home = <Navigate to={homePathForRole(session.role)} replace />;
+
   return (
     <div className="h-screen">
       {isManagerWorkspace ? (
@@ -50,7 +59,7 @@ export default function App() {
             <Route path="/analytics/type" element={<ReportsPage />} />
             <Route path="/analytics/comparison" element={<ComparisonPage />} />
             <Route path="/analytics/saved" element={<SavedReportsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={home} />
           </Routes>
         </ManagerShell>
       ) : (
@@ -66,7 +75,7 @@ export default function App() {
               <Route path="/reports" element={<PortalModuleRoute moduleKey="reports" />} />
               <Route path="/reports/saved" element={<SavedReportsPage />} />
               <Route path="/admin" element={<PortalModuleRoute moduleKey="admin" />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={home} />
             </Routes>
           </main>
         </div>

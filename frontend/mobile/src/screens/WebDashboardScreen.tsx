@@ -3,7 +3,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
-import { roleLabel } from '../auth/roles';
+import { dashboardPathForRole, roleLabel } from '../auth/roles';
 import type { AuthSession } from '../auth/types';
 import { webUiUrl } from '../config';
 import { colors, font, spacing } from '../theme';
@@ -30,17 +30,26 @@ export function sessionScript(session: AuthSession): string {
   )}); true;`;
 }
 
+// Base address plus the role's starting path ("/analytics/type", "/").
+function joinUrl(base: string, path: string): string {
+  return `${base.replace(/\/+$/, '')}${path}`;
+}
+
 /**
- * Manager and Officer sign-in lands here: the Operations Dashboard that is
- * normally the desktop portal, loaded inside the app so they do not have to
- * leave the phone and sign in again.
+ * Manager and Officer sign-in lands here: the part of the Operations Dashboard
+ * that their role uses, loaded inside the app so they do not have to leave the
+ * phone and sign in again. The Park Manager goes to the analytics workspace,
+ * the Operations Officer to the collar alert dashboard.
  *
  * The session is handed over through the WebView's localStorage rather than
  * the URL, so the token never ends up in a bookmark, a history entry or a
  * server access log.
  */
 export default function WebDashboardScreen({ session, onSignOut }: Props) {
-  const url = useMemo(() => webUiUrl(), []);
+  const url = useMemo(
+    () => joinUrl(webUiUrl(), dashboardPathForRole(session.role)),
+    [session.role]
+  );
   const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
