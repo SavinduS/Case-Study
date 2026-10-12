@@ -1,5 +1,5 @@
-const { buildDuplicateQuery, DUPLICATE_RADIUS_M, DUPLICATE_WINDOW_MS } = require('../utils/duplicate');
-const { findSectorByCode, findSectorForPoint, distanceMeters, normalizeSectorCode } = require('../config/areas');
+const { buildDuplicateQuery, DUPLICATE_RADIUS_M, DUPLICATE_WINDOW_MS } = require('../../utils/duplicate');
+const { findSectorByCode, findSectorForPoint, distanceMeters, normalizeSectorCode } = require('../../config/areas');
 
 describe('duplicate detection rules (FR-15 / E4)', () => {
   const now = Date.UTC(2026, 0, 15, 12, 0, 0);

@@ -1,4 +1,6 @@
 import { File } from 'expo-file-system';
+import { isAuthSession } from '../auth/sessionShape';
+import type { AuthSession } from '../auth/types';
 import type {
   ConflictReportConfirmation,
   ReportSubmission,
@@ -31,10 +33,18 @@ export class NetworkError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// Shared request helper (20s timeout, base-URL resolution, ApiError for HTTP
+// failures / NetworkError when unreachable). Exported for the field-incident
+// API module so every endpoint shares timeout and error handling.
+export async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  token?: string
+): Promise<T> {
   const isForm = options.body instanceof FormData;
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   if (!isForm && options.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const base = await getBaseUrl();
   const controller = new AbortController();
@@ -71,6 +81,52 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export async function pingServer(): Promise<{ reachable: boolean; base: string }> {
   const { reachable, base } = await probeServer();
   return { reachable, base };
+}
+
+// Sign in with either the email address or the phone number. The server
+// decides the role, so the response is checked for a usable session before it
+// reaches the UI — a role the app cannot route on must not reach the app as a
+// half-valid session.
+export async function login(identifier: string, password: string): Promise<AuthSession> {
+  const data = await request<Record<string, unknown>>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password })
+  });
+  if (!isAuthSession(data)) {
+    throw new ApiError(500, {
+      message: 'Sign-in response was not understood. Please try again.'
+    });
+  }
+  return data;
+}
+
+// Revalidate a stored session on app start. Throws ApiError(401) when the
+// token expired or the account was removed.
+export async function fetchMe(
+  token: string
+): Promise<Omit<AuthSession, 'token'>> {
+  return request<Omit<AuthSession, 'token'>>('/api/auth/me', {}, token);
+}
+
+// Public sign-up for villagers. The server always creates a villager account
+// regardless of anything sent here; the response is the same session shape as
+// login, so the caller can drop straight into the app.
+export async function registerVillager(input: {
+  name: string;
+  phone: string;
+  password: string;
+  email?: string;
+}): Promise<AuthSession> {
+  const data = await request<Record<string, unknown>>('/api/auth/register/villager', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  });
+  if (!isAuthSession(data)) {
+    throw new ApiError(500, {
+      message: 'Sign-up response was not understood. Please try again.'
+    });
+  }
+  return data;
 }
 
 export function createReport(body: ReportSubmission): Promise<ConflictReportConfirmation> {

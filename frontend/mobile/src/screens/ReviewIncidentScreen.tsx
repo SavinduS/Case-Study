@@ -12,6 +12,10 @@ interface Props {
   onEdit: () => void;
   onSubmit: () => void;
   onChangeLocation: () => void;
+  /** Permanent server rejection or storage failure to show above Submit. */
+  submitError?: string | null;
+  /** True while the report is being saved/uploaded. */
+  submitting?: boolean;
 }
 
 // F2: Review Incident — read-only summary of the F1 draft.
@@ -21,7 +25,9 @@ export default function ReviewIncidentScreen({
   incident,
   onEdit,
   onSubmit,
-  onChangeLocation
+  onChangeLocation,
+  submitError,
+  submitting
 }: Props) {
   const [lon, lat] = incident.location.coordinates;
 
@@ -64,8 +70,16 @@ export default function ReviewIncidentScreen({
       </Pressable>
 
       <View style={styles.buttonRow}>
-        <PrimaryButton label="Submit Report" onPress={onSubmit} />
+        <PrimaryButton
+          label={submitting ? 'Submitting…' : 'Submit Report'}
+          onPress={onSubmit}
+          disabled={submitting}
+          loading={submitting}
+        />
       </View>
+      {submitError ? (
+        <StatusBanner tone="error" title="Report needs attention" message={submitError} />
+      ) : null}
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"

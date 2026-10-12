@@ -5,16 +5,35 @@ import ReviewIncidentScreen from '../screens/ReviewIncidentScreen';
 import SubmitResultScreen from '../screens/SubmitResultScreen';
 import MyIncidentsScreen from '../screens/MyIncidentsScreen';
 import type { ValidatedFieldIncident } from '../fieldIncidentTypes';
+import type { StoredFieldIncident } from '../services/incidentStorage';
 
 const LocationMock = require('expo-location');
 
 function validIncident(): ValidatedFieldIncident {
   return {
     capturedAt: new Date('2026-06-20T10:24:00.000Z').toISOString(),
-    incidentType: 'snare',
+    incidentType: 'snare_illegal_hunting',
     description: 'Wire snare near trail',
     location: { coordinates: [36.82145, -1.29234], accuracyMeters: 8, manual: false },
     photoUri: null
+  };
+}
+
+function storedRow(
+  id: string,
+  status: 'pending' | 'synced' | 'failed',
+  incidentType: ValidatedFieldIncident['incidentType'] = validIncident().incidentType
+): StoredFieldIncident {
+  return {
+    id,
+    reportId: id,
+    incident: { ...validIncident(), incidentType },
+    status,
+    createdAt: new Date('2026-06-20T10:24:00.000Z').toISOString(),
+    updatedAt: new Date('2026-06-20T10:24:00.000Z').toISOString(),
+    retryCount: 0,
+    displayId: null,
+    serverPhotoUrl: null
   };
 }
 
@@ -146,7 +165,7 @@ describe('NewFieldIncidentScreen', () => {
     // review
     press(renderer.root, 'Review Incident');
     expect(onReview).toHaveBeenCalledTimes(1);
-    expect(onReview.mock.calls[0][0].incidentType).toBe('snare');
+    expect(onReview.mock.calls[0][0].incidentType).toBe('snare_illegal_hunting');
     expect(onReview.mock.calls[0][0].description).toBe('Wire snare near the trail');
   });
 
@@ -169,7 +188,7 @@ describe('NewFieldIncidentScreen', () => {
     await act(async () => {
       renderer = create(
         <NewFieldIncidentScreen
-          initialDraft={{ incidentType: 'elephant', description: 'herd' }}
+          initialDraft={{ incidentType: 'animal_carcass', description: 'herd' }}
           onReview={jest.fn()}
           onOpenManualLocation={jest.fn()}
         />
@@ -178,7 +197,7 @@ describe('NewFieldIncidentScreen', () => {
     });
     await flush();
     const t = texts(renderer.root).join(' ');
-    expect(t).toMatch(/Elephant/);
+    expect(t).toMatch(/Carcass/);
   });
 });
 
@@ -199,7 +218,7 @@ describe('ReviewIncidentScreen', () => {
     expect(t).toMatch(/Review Incident/);
     expect(t).toMatch(/Snare/);
     expect(t).toMatch(/Wire snare near trail/);
-    expect(t).toMatch(/\(GPS\)/);
+    expect(t).toMatch(/\(GPS/);
     expect(t).toMatch(/None/);
   });
 
@@ -287,9 +306,9 @@ describe('MyIncidentsScreen status chips', () => {
   });
 
   it('renders PENDING and SYNCHRONIZED badges', () => {
-    const incidents: any[] = [
-      { id: 'p1', status: 'pending', incident: validIncident() },
-      { id: 's1', status: 'synced', incident: { ...validIncident(), incidentType: 'elephant' as const } }
+    const incidents = [
+      storedRow('p1', 'pending'),
+      storedRow('s1', 'synced', 'animal_carcass')
     ];
     let renderer: any = null;
     act(() => {
@@ -308,7 +327,7 @@ describe('MyIncidentsScreen status chips', () => {
     act(() => {
       renderer = create(
         <MyIncidentsScreen
-          incidents={[{ id: 'p1', status: 'pending', incident: validIncident() }]}
+          incidents={[storedRow('p1', 'pending')]}
           syncing={true}
           onSyncNow={onSync}
           onNewReport={jest.fn()}
@@ -340,7 +359,7 @@ describe('MyIncidentsScreen status chips', () => {
     act(() => {
       renderer = create(
         <MyIncidentsScreen
-          incidents={[{ id: 'p1', status: 'pending', incident: validIncident() }]}
+          incidents={[storedRow('p1', 'pending')]}
           syncing={false}
           onSyncNow={onSync}
           onNewReport={onNew}
@@ -393,7 +412,7 @@ describe('pressable style states (coverage)', () => {
     act(() => {
       r4 = create(
         <MyIncidentsScreen
-          incidents={[{ id: 'p1', status: 'pending', incident: validIncident() }]}
+          incidents={[storedRow('p1', 'pending')]}
           syncing={false}
           onSyncNow={jest.fn()}
           onNewReport={jest.fn()}

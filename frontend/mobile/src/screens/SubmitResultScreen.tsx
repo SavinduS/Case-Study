@@ -10,36 +10,52 @@ interface Props {
   incident: ValidatedFieldIncident;
   onGoToMyIncidents: () => void;
   onNewReport: () => void;
+  /** Storage status of the saved report (Alt Flow 3 direct submit ⇒ synced). */
+  status?: 'pending' | 'synced';
+  /** Server displayId (e.g. FI-2026-0001) when synchronized. */
+  displayId?: string | null;
 }
 
-// F2: Submit Result — offline confirmation. The report is saved on-device
-// with "Pending Synchronization" status; real sync lands in F3.
+// F2: Submit Result — offline confirmation. The report is saved on-device;
+// a synchronized report shows its server displayId (storyboard panel 9).
 export default function SubmitResultScreen({
   incident,
   onGoToMyIncidents,
-  onNewReport
+  onNewReport,
+  status = 'pending',
+  displayId
 }: Props) {
+  const synced = status === 'synced';
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <View style={styles.badge}>
           <Text style={styles.badgeIcon}>✓</Text>
         </View>
-        <Text style={styles.title}>Report Saved Offline</Text>
+        <Text style={styles.title}>{synced ? 'Report Synchronized' : 'Report Saved Offline'}</Text>
         <Text style={styles.body}>
           {FIELD_INCIDENT_LABELS[incident.incidentType]} ·{' '}
           {new Date(incident.capturedAt).toLocaleString()}
         </Text>
+        {synced && displayId ? <Text style={styles.body}>{displayId}</Text> : null}
 
         <StatusBanner
           tone="offline"
-          title="Report saved offline — Pending Synchronization"
-          message="It stays on this device and will sync when connectivity returns."
+          title={
+            synced ? 'Report synchronized' : 'Report saved offline — Pending Synchronization'
+          }
+          message={
+            synced
+              ? 'The central database confirmed receipt.'
+              : 'It stays on this device and will sync when connectivity returns.'
+          }
         />
 
         <View style={styles.statusRow}>
           <View style={styles.statusDot} />
-          <Text style={styles.statusText}>PENDING SYNCHRONIZATION</Text>
+          <Text style={styles.statusText}>
+            {synced ? 'SYNCHRONIZED' : 'PENDING SYNCHRONIZATION'}
+          </Text>
         </View>
       </View>
 

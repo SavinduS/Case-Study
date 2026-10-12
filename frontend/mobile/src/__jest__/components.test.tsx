@@ -55,20 +55,20 @@ describe('FieldIncidentTypePicker', () => {
     for (const label of Object.values(FIELD_INCIDENT_LABELS)) {
       expect(t).toMatch(label.split(' ')[0]);
     }
-    const poacher = r.root.findAll(
-      (n: any) => n.props?.accessibilityLabel === FIELD_INCIDENT_LABELS.poacher
+    const camp = r.root.findAll(
+      (n: any) => n.props?.accessibilityLabel === FIELD_INCIDENT_LABELS.illegal_campsite
     )[0];
-    act(() => poacher.props.onPress());
-    expect(onChange).toHaveBeenCalledWith('poacher');
+    act(() => camp.props.onPress());
+    expect(onChange).toHaveBeenCalledWith('illegal_campsite');
   });
 
   it('marks selected option checked and shows error', () => {
     let r: any = null;
     act(() => {
-      r = create(<FieldIncidentTypePicker value="snare" onChange={jest.fn()} error="Pick one" />);
+      r = create(<FieldIncidentTypePicker value="snare_illegal_hunting" onChange={jest.fn()} error="Pick one" />);
     });
     const snare = r.root.findAll(
-      (n: any) => n.props?.accessibilityLabel === FIELD_INCIDENT_LABELS.snare
+      (n: any) => n.props?.accessibilityLabel === FIELD_INCIDENT_LABELS.snare_illegal_hunting
     )[0];
     expect(snare.props.accessibilityState).toMatchObject({ checked: true });
     expect(allTexts(r.root)).toMatch(/Pick one/);

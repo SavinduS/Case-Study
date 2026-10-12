@@ -70,10 +70,24 @@ export function isNetworkError(e: unknown): boolean {
   );
 }
 
+export interface ServerSyncedInfo {
+  displayId?: string | null;
+  serverPhotoUrl?: string | null;
+}
+
 export interface SyncDeps {
   listPending?: () => Promise<StoredFieldIncident[]>;
-  postIncident: (incident: ValidatedFieldIncident) => Promise<{ serverId: string }>;
-  onSynced?: (id: string) => Promise<unknown>;
+  /**
+   * Push one incident. Receives the stored row as the second argument so the
+   * caller can send the stable `reportId` (idempotency) and any photo. The
+   * extra argument is optional — existing single-argument implementations
+   * keep working. May resolve server info (displayId/photo URL) for storage.
+   */
+  postIncident: (
+    incident: ValidatedFieldIncident,
+    item?: StoredFieldIncident
+  ) => Promise<{ serverId: string } & ServerSyncedInfo>;
+  onSynced?: (id: string, server?: ServerSyncedInfo) => Promise<unknown>;
   onFailed?: (id: string, error: string) => Promise<unknown>;
   /** Max attempts per report (default 3). */
   maxRetries?: number;
@@ -122,8 +136,11 @@ export async function syncPendingIncidents(deps: SyncDeps): Promise<SyncSummary>
     while (attempt < maxRetries && !done) {
       attempt += 1;
       try {
-        await deps.postIncident(item.incident);
-        await markSynced(item.id);
+        const res = await deps.postIncident(item.incident, item);
+        await markSynced(item.id, {
+          displayId: res.displayId ?? null,
+          serverPhotoUrl: res.serverPhotoUrl ?? null
+        });
         summary.synced.push(item.id);
         done = true;
       } catch (e) {

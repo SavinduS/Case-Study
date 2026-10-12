@@ -14,11 +14,13 @@
     "seed": "npm run seed -w backend",
     "seed:reset": "npm run seed:reset -w backend",
     "test": "npm run test -w backend",
-    "test:web": "npm run test -w frontend/web"
+    "test:web": "npm run test -w frontend/web",
+    "test:mobile": "npm run test -w frontend/mobile"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.26.9",
     "@babel/preset-react": "^7.26.3",
+    "jsdom": "^25.0.1",
     "react-test-renderer": "^19.2.3"
   }
 }

@@ -55,6 +55,13 @@ export const getGeofences = () => request('/geofences');
 export const getCollars = () => request('/collars');
 export const getRangerTeams = () => request('/parks/ranger-teams');
 
+/**
+ * Sign in to the portal. `identifier` is an email address or a phone number.
+ * Returns `{ id, name, role, token }` — the role is decided by the server.
+ */
+export const login = (identifier, password) =>
+  request('/auth/login', { method: 'POST', body: { identifier, password } });
+
 /** Open alerts, already ordered by the server's priority score. */
 export const getAlerts = () => request('/alerts');
 
@@ -82,5 +89,15 @@ export const reportSignalLost = (collarId, lost = true, reason) =>
  * idempotency key the offline queue attaches — see src/offline/syncQueue.js. */
 export const createIncident = (body) => request('/incidents', { method: 'POST', body });
 export const getMyIncidents = () => request('/incidents/mine');
+
+// Analytics workspace contract. Kept alongside the shared client so feature
+// pages and consumers can use one API surface.
+export const getAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const getSavedAnalyticsReports = () => request('/analytics/reports');
+export const saveAnalyticsReport = (criteria) =>
+  request('/analytics/generate', { method: 'POST', body: criteria });
+export const exportAnalyticsReport = (reportId, format) =>
+  request(`/analytics/reports/${encodeURIComponent(reportId)}/export?format=${format}`);
 
 export { ApiError };

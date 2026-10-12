@@ -4,37 +4,39 @@ import OfflineBadge from '../components/OfflineBadge';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
 import { FIELD_INCIDENT_LABELS } from '../constants/fieldIncident';
-import type { ValidatedFieldIncident } from '../fieldIncidentTypes';
+import type { StoredFieldIncident } from '../services/incidentStorage';
+import { statusLabelForIncident } from '../services/incidentStorage';
 import { colors, font, radius, spacing } from '../theme';
 
-export type IncidentSyncStatus = 'pending' | 'synced';
-
-export interface StoredFieldIncident {
-  id: string;
-  incident: ValidatedFieldIncident;
-  status: IncidentSyncStatus;
-}
+export type { StoredFieldIncident };
 
 interface Props {
   incidents: StoredFieldIncident[];
   syncing: boolean;
   onSyncNow: () => void;
   onNewReport: () => void;
+  /** Batch sync warning (rejections/offline) shown above the list. */
+  syncError?: string | null;
 }
 
-function statusChip(status: IncidentSyncStatus): { label: string; pending: boolean } {
-  return status === 'pending'
-    ? { label: 'PENDING SYNCHRONIZATION', pending: true }
-    : { label: 'SYNCHRONIZED', pending: false };
+function statusChip(status: StoredFieldIncident['status']): {
+  label: string;
+  pending: boolean;
+  failed: boolean;
+} {
+  if (status === 'pending') return { label: 'PENDING SYNCHRONIZATION', pending: true, failed: false };
+  if (status === 'failed') return { label: statusLabelForIncident('failed').toUpperCase(), pending: false, failed: true };
+  return { label: 'SYNCHRONIZED', pending: false, failed: false };
 }
 
 // F3: My Incidents — offline-first list wired to the bottom tab.
-// UI-only: Sync Now flips pending -> synchronized with sample data.
+// Rows render stored reports (pending / failed / synchronized).
 export default function MyIncidentsScreen({
   incidents,
   syncing,
   onSyncNow,
-  onNewReport
+  onNewReport,
+  syncError
 }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -49,6 +51,10 @@ export default function MyIncidentsScreen({
         disabled={syncing || incidents.length === 0}
         loading={syncing}
       />
+
+      {syncError ? (
+        <StatusBanner tone="error" title="Sync needs attention" message={syncError} />
+      ) : null}
 
       {incidents.length === 0 ? (
         <StatusBanner
@@ -65,6 +71,7 @@ export default function MyIncidentsScreen({
               <Text style={styles.cardValue}>
                 {FIELD_INCIDENT_LABELS[item.incident.incidentType]}
               </Text>
+              {item.displayId ? <Text style={styles.cardMeta}>{item.displayId}</Text> : null}
               <Text style={styles.cardMeta}>
                 {new Date(item.incident.capturedAt).toLocaleString()} · {lat.toFixed(5)},{' '}
                 {lon.toFixed(5)}
@@ -72,8 +79,24 @@ export default function MyIncidentsScreen({
               <Text style={styles.cardMeta} numberOfLines={2}>
                 {item.incident.description}
               </Text>
-              <View style={[styles.badge, chip.pending ? styles.badgePending : styles.badgeSynced]}>
-                <Text style={chip.pending ? styles.badgePendingText : styles.badgeSyncedText}>
+              {item.status === 'failed' && item.lastError ? (
+                <Text style={styles.cardError}>{item.lastError}</Text>
+              ) : null}
+              <View
+                style={[
+                  styles.badge,
+                  chip.pending ? styles.badgePending : chip.failed ? styles.badgeFailed : styles.badgeSynced
+                ]}
+              >
+                <Text
+                  style={
+                    chip.pending
+                      ? styles.badgePendingText
+                      : chip.failed
+                        ? styles.badgeFailedText
+                        : styles.badgeSyncedText
+                  }
+                >
                   {chip.label}
                 </Text>
               </View>
@@ -124,6 +147,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: font.small
   },
+  cardError: {
+    color: colors.danger,
+    fontSize: font.small
+  },
   badge: {
     alignSelf: 'flex-start',
     marginTop: spacing.xs,
@@ -140,6 +167,10 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft
   },
+  badgeFailed: {
+    borderColor: colors.danger,
+    backgroundColor: colors.surface
+  },
   badgePendingText: {
     color: colors.offlineText,
     fontSize: font.tiny,
@@ -148,6 +179,12 @@ const styles = StyleSheet.create({
   },
   badgeSyncedText: {
     color: colors.primaryDark,
+    fontSize: font.tiny,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  badgeFailedText: {
+    color: colors.danger,
     fontSize: font.tiny,
     fontWeight: '800',
     letterSpacing: 0.5

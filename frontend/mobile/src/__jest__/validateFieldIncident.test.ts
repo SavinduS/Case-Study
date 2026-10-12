@@ -8,7 +8,7 @@ import {
 function baseDraft(): FieldIncidentDraft {
   return {
     capturedAt: new Date('2026-06-20T10:24:00.000Z').toISOString(),
-    incidentType: 'snare',
+    incidentType: 'snare_illegal_hunting',
     description: 'Illegal wire snare found near the game trail. No animals caught.',
     location: { coordinates: [36.821456, -1.292345], accuracyMeters: 8, manual: false },
     photoUri: null
@@ -21,7 +21,12 @@ describe('validateFieldIncident (mobile)', () => {
   });
 
   it('accepts every incident type', () => {
-    for (const incidentType of ['snare', 'poacher', 'elephant', 'crop'] as const) {
+    for (const incidentType of [
+      'snare_illegal_hunting',
+      'animal_carcass',
+      'footprints',
+      'illegal_campsite'
+    ] as const) {
       expect(validateFieldIncident({ ...baseDraft(), incidentType })).toEqual({});
     }
   });
@@ -97,7 +102,7 @@ describe('validateFieldIncident (mobile)', () => {
     const result = toValidatedFieldIncident({ ...baseDraft(), description: '  snare near trail  ' });
     expect(result).not.toBeNull();
     expect(result?.description).toBe('snare near trail');
-    expect(result?.incidentType).toBe('snare');
+    expect(result?.incidentType).toBe('snare_illegal_hunting');
     expect(result?.location?.coordinates).toEqual([36.821456, -1.292345]);
     expect(result?.capturedAt).toBe(baseDraft().capturedAt);
   });

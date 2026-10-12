@@ -5,7 +5,7 @@ import type { StoredFieldIncident } from '../services/incidentStorage';
 function incident(): ValidatedFieldIncident {
   return {
     capturedAt: new Date().toISOString(),
-    incidentType: 'elephant',
+    incidentType: 'animal_carcass',
     description: 'herd near fence',
     location: { coordinates: [81.41, 6.47], manual: false },
     photoUri: null
@@ -15,6 +15,7 @@ function incident(): ValidatedFieldIncident {
 function stored(id: string, overrides: Partial<StoredFieldIncident> = {}): StoredFieldIncident {
   return {
     id,
+    reportId: id,
     incident: incident(),
     status: 'pending',
     createdAt: new Date().toISOString(),

@@ -6,7 +6,7 @@
  * button. `collars`, `alerts` and `geofences` are driven by the collar
  * boundary alert use case and open real panels.
  */
-const RAIL = [
+export const RAIL = [
   {
     key: 'collars',
     label: 'Tracked collars',
@@ -61,8 +61,8 @@ export default function Sidebar({ activeKey, onSelect }) {
   return (
     <aside
       aria-label="Modules"
-      className="absolute left-0 top-0 z-[800] flex h-full w-14 flex-col items-center gap-1
-        bg-park-900/95 py-3 text-white/70 backdrop-blur"
+      className="absolute left-0 top-0 z-[800] hidden h-full w-14 flex-col items-center gap-1
+        bg-park-900/95 py-3 text-white/70 backdrop-blur lg:flex"
     >
       {RAIL.map((item) => {
         const isActive = item.key === activeKey;

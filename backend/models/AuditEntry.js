@@ -6,7 +6,7 @@ const { AUDIT_ACTION } = require('../utils/collarAlertConstants');
 const auditEntrySchema = new mongoose.Schema({
   auditId: { type: String, required: true, unique: true, index: true },
   alertId: { type: String, default: null, index: true },
-  action: { type: String, enum: Object.values(AUDIT_ACTION), required: true },
+  action: { type: String, enum: [...Object.values(AUDIT_ACTION), 'ANALYTICS_REPORT_GENERATED', 'ANALYTICS_REPORT_EXPORTED'], required: true },
   actor: { type: String, required: true },
   detail: { type: String, required: true },
   at: { type: Date, default: Date.now, index: true }

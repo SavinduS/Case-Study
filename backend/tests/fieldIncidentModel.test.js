@@ -42,18 +42,22 @@ describe('FieldIncident model (F1)', () => {
     expect(FieldIncident.schema.path('reporter').options.ref).toBe('User');
   });
 
-  test('requires reportId, description, coordinates, capturedAt and photo', () => {
+  test('requires reportId, description, coordinates and capturedAt (photo optional)', () => {
     const doc = new FieldIncident({
       incidentType: 'animal_carcass',
-      location: { coordinates: [] },
-      photo: {}
+      location: { coordinates: [] }
     });
     const err = doc.validateSync();
     expect(err.errors.reportId).toBeDefined();
     expect(err.errors.description).toBeDefined();
     expect(err.errors.capturedAt).toBeDefined();
-    expect(err.errors['photo.path']).toBeDefined();
-    expect(err.errors['photo.mimeType']).toBeDefined();
+    expect(err.errors['photo.path']).toBeUndefined();
+    expect(err.errors['photo.mimeType']).toBeUndefined();
+  });
+
+  test('accepts a document without a photo', () => {
+    const { photo: _drop, ...rest } = validDoc();
+    expect(new FieldIncident(rest).validateSync()).toBeUndefined();
   });
 
   test('rejects descriptions longer than 500 characters', () => {

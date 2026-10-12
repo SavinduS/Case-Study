@@ -21,7 +21,8 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
   return (
     <section
       aria-label="Operations records"
-      className="absolute left-16 top-16 z-[750] w-[26rem] rounded-lg bg-white shadow-2xl ring-1 ring-black/10"
+      className="absolute inset-x-3 top-16 z-[750] max-w-full rounded-lg bg-white shadow-2xl
+        ring-1 ring-black/10 lg:left-16 lg:w-[26rem]"
     >
       <header className="flex items-center gap-2 border-b border-stone-200 px-4 py-2.5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-stone-800">Operations Records</h2>

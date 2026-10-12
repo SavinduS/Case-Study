@@ -43,13 +43,13 @@ describe('useFieldIncidentForm', () => {
   it('respects initialDraft values', () => {
     const h = renderForm({
       capturedAt: '2026-01-01T00:00:00.000Z',
-      incidentType: 'elephant',
+      incidentType: 'animal_carcass',
       description: 'herd',
       photoUri: 'file:///x.jpg'
     });
     const f = h.get();
     expect(f.capturedAt).toBe('2026-01-01T00:00:00.000Z');
-    expect(f.incidentType).toBe('elephant');
+    expect(f.incidentType).toBe('animal_carcass');
     expect(f.description).toBe('herd');
     expect(f.photoUri).toBe('file:///x.jpg');
     h.unmount();
@@ -57,10 +57,10 @@ describe('useFieldIncidentForm', () => {
 
   it('updates incidentType and description fields', () => {
     const h = renderForm();
-    act(() => h.get().setIncidentType('poacher'));
-    expect(h.get().incidentType).toBe('poacher');
-    act(() => h.get().setDescription('saw poacher'));
-    expect(h.get().description).toBe('saw poacher');
+    act(() => h.get().setIncidentType('illegal_campsite'));
+    expect(h.get().incidentType).toBe('illegal_campsite');
+    act(() => h.get().setDescription('saw camp'));
+    expect(h.get().description).toBe('saw camp');
     h.unmount();
   });
 
@@ -101,7 +101,7 @@ describe('useFieldIncidentForm', () => {
 
   it('review() succeeds with valid draft and trims description', () => {
     const h = renderForm();
-    act(() => h.get().setIncidentType('snare'));
+    act(() => h.get().setIncidentType('snare_illegal_hunting'));
     act(() => h.get().setDescription('  wire snare  '));
     let result: any = null;
     act(() => {
@@ -109,7 +109,7 @@ describe('useFieldIncidentForm', () => {
     });
     expect(result).not.toBeNull();
     expect(result.description).toBe('wire snare');
-    expect(result.incidentType).toBe('snare');
+    expect(result.incidentType).toBe('snare_illegal_hunting');
     expect(result.location).toEqual(LOC);
     expect(h.get().errors).toEqual({});
     h.unmount();
@@ -117,7 +117,7 @@ describe('useFieldIncidentForm', () => {
 
   it('review() fails on over-long description', () => {
     const h = renderForm();
-    act(() => h.get().setIncidentType('crop'));
+    act(() => h.get().setIncidentType('footprints'));
     act(() => h.get().setDescription('x'.repeat(501)));
     let result: any = 'unset';
     act(() => {

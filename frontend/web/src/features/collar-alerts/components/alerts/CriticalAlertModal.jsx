@@ -51,14 +51,14 @@ export default function CriticalAlertModal({
         {/* Role="alert" announces the new critical alert immediately. */}
         <div role="alert" aria-live="assertive">
           <header
-            className={`flex items-center gap-3 px-6 py-3 text-white ${
+            className={`flex items-start gap-2.5 px-4 py-3 text-white sm:items-center sm:gap-3 sm:px-6 ${
               isDelayed ? 'bg-gold-500' : 'bg-alert-600'
             }`}
           >
             <svg className="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2 1 21h22L12 2Zm0 4 7.5 13h-15L12 6Zm-1 4v4h2v-4h-2Zm0 5v2h2v-2h-2Z" />
             </svg>
-            <h2 id="critical-alert-title" className="text-lg font-extrabold uppercase tracking-wide">
+            <h2 id="critical-alert-title" className="text-sm font-extrabold uppercase leading-snug tracking-wide sm:text-lg">
               {isDelayed ? 'Delayed Incident' : 'Critical Alert'}: Boundary Breach Detected (Asset {alert.collarId})
             </h2>
             <button
@@ -73,7 +73,7 @@ export default function CriticalAlertModal({
             </button>
           </header>
 
-          <div className="grid gap-6 px-6 py-5 md:grid-cols-2">
+          <div className="grid gap-4 px-4 py-4 sm:gap-6 sm:px-6 sm:py-5 md:grid-cols-2">
             <div>
               <AlertMiniMap zone={zone} position={alert.position} />
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
@@ -134,25 +134,27 @@ export default function CriticalAlertModal({
             </div>
           </div>
 
-          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-stone-200 bg-stone-50 px-6 py-4">
+          <footer className="flex flex-col gap-2 border-t border-stone-200 bg-stone-50 px-4 py-3 sm:flex-row
+          sm:flex-wrap sm:items-center sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
             {isDelayed ? (
-              <span className="mr-auto text-xs text-stone-600">
+              <span className="text-xs text-stone-600 sm:mr-auto">
                 Reconstructed from a delayed telemetry batch. Decide whether a patrol check is required.
               </span>
             ) : (
-              <span className="mr-auto text-xs text-stone-600">
+              <span className="text-xs text-stone-600 sm:mr-auto">
                 Actions are written to the wildlife monitoring audit trail.
               </span>
             )}
-            <Button variant="outline" onClick={() => setShowFalseAlarm(true)}>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => setShowFalseAlarm(true)}>
               Dismiss &amp; Log
             </Button>
             {isDelayed ? (
-              <Button variant="primary" disabled={busy} onClick={() => onDispatchPatrolCheck(alert.alertId)}>
+              <Button className="w-full sm:w-auto" variant="primary" disabled={busy} onClick={() => onDispatchPatrolCheck(alert.alertId)}>
                 Dispatch Patrol Check
               </Button>
             ) : (
               <Button
+                className="w-full sm:w-auto"
                 variant="primary"
                 disabled={busy}
                 onClick={() => setShowDispatch(true)}
@@ -161,7 +163,7 @@ export default function CriticalAlertModal({
                 Acknowledge &amp; Dispatch Ranger
               </Button>
             )}
-            <Button variant="ghost" onClick={onMonitor}>
+            <Button className="w-full sm:w-auto" variant="ghost" onClick={onMonitor}>
               Monitor Closely
             </Button>
           </footer>

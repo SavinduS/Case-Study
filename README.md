@@ -42,7 +42,7 @@ one origin with no CORS setup and no base URL in the bundle.
 | --- | --- |
 | `npm run dev` | API + dashboard together |
 | `npm run backend` / `npm run web` | Run either one on its own |
-| `npm run seed` | Upsert reference data (safe to re-run) |
+| `npm run seed` | Upsert reference data + one demo login per role (safe to re-run) |
 | `npm run seed:reset` | Clear alerts/audit/dispatches and restore collar positions |
 | `npm run test` | Backend: Jest (conflict reports) then Vitest (collar alerts) |
 | `npm run test:web` | Frontend Vitest suite |
@@ -64,10 +64,13 @@ backend/
   seed/          referenceData (shared), seedReferenceData, resetOperationalData
 
 frontend/web/src/
-  layout/                      Topbar + module rail
+  layout/                      Topbar (session + Sign out) + module rail
+  layout/usePortalSession.js   Session for the dashboard, incl. app handoff
   components/ui/               Button, Badge, Modal, ModulePlaceholder
+  pages/LoginPage.jsx          Portal sign-in (email or phone)
   pages/PortalModuleRoute.jsx  Placeholder route for other members' modules
   services/api.js              All HTTP calls
+  services/session.js          Read / save / sign out the session
   features/collar-alerts/
     domain/labels.js           Display vocabulary only
     hooks/useCollarAlerts.js   Polls the API, sends officer responses
@@ -165,3 +168,107 @@ headless browser.
   officer is not handed the same false alarm on every transmission.
 - **Coordinates are `[lng, lat]`** everywhere (GeoJSON). `leafletAdapter.js`
   is the single conversion point to Leaflet's `[lat, lng]`.
+
+## Mobile sign-in and role routing
+
+One login screen for the app; the role in the token decides what opens next.
+
+| Role | After sign-in |
+| --- | --- |
+| Park Manager | Analytics workspace (`/analytics/type`) in a WebView |
+| Operations Officer | Collar alert dashboard (`/`) in a WebView |
+| Ranger | Field app — offline incident capture (report → review → My Incidents) |
+| Villager | Field app — conflict report (submit → pending/success → My Reports) |
+
+Each role has its own home in the portal, on both surfaces: signing in on the
+mobile app opens the matching dashboard path, and the same is true of the web
+sign-in page. A Park Manager who lands on `/` is moved to the analytics
+workspace rather than the officer dashboard.
+
+### Try it
+
+```bash
+npm run seed     # also creates one demo account per role
+npm run backend  # the login screen talks to this
+npm run mobile   # expo start
+```
+
+`npm run seed` writes these accounts (demo environment only). Every one of
+them signs in with **either** the email address or the phone number, and the
+password is `password123`:
+
+| Role | Email | Phone | Lands on |
+| --- | --- | --- | --- |
+| Park Manager | `manager@wildlife.demo` | `+94770000001` | Analytics workspace |
+| Operations Officer | `officer@wildlife.demo` | `+94770000002` | Collar alert dashboard |
+| Ranger | `ranger@wildlife.demo` | `+94770000003` | Field app |
+| Villager | `villager@wildlife.demo` | `+94770000004` | Field app |
+
+### How it works
+
+- `POST /api/auth/login` takes one `identifier` — an email address or a phone
+  number — and returns `{ id, name, role, token }`. The role is decided by the
+  server, never by the client. Emails are matched case-insensitively, and the
+  old `phone` field is still accepted so existing callers keep working.
+- `email` is optional and sparse on the `User` model: an account without one is
+  valid, and many accounts without one do not collide on the unique index.
+- **Mobile**: the session is kept on the device (`@wildlife-alert/session`).
+  On every launch `GET /api/auth/me` revalidates it: an expired token or a
+  deleted account returns to the login screen, an unreachable server keeps the
+  stored session so the app stays usable offline.
+- **Web dashboard opened in a browser**: `/login` signs in against the same
+  endpoint and keeps the session in the browser's `localStorage`. Villager and
+  Ranger accounts are refused — the dashboard is for Operations Officer and
+  Park Manager. Every other route redirects to `/login` without a session.
+- **Web dashboard inside the app's WebView**: the session is handed over
+  through `localStorage` (`@wildlife-alert/web-session`), never in the URL, so
+  the token cannot end up in a history entry or an access log. If the page
+  comes up without it, it asks the app (`requestSession`) and waits briefly
+  rather than flashing the sign-in page.
+- **Signing out** from the top bar clears the session and returns to `/login`
+  in a browser, or tells the app (`signedOut`) so the phone returns to its own
+  login screen. Ranger and Villager sign out from the bottom bar of their app.
+
+### Where the code lives
+
+```
+backend/
+  controllers/authController.js  register, login (email or phone), me
+  routes/auth.js                 POST /register, POST /login, GET /me
+  models/User.js                 name, phone, optional email, role
+  seed/demoUsers.js              One demo login per role
+
+frontend/mobile/src/
+  auth/roles.ts                  Role -> destination mapping (unit-tested)
+  auth/session.ts                AsyncStorage session (load/save/clear)
+  auth/sessionShape.ts           Guards stored values before they are trusted
+  screens/LoginScreen.tsx        Phone + password, inline errors, role legend
+  screens/WebDashboardScreen.tsx WebView handoff for Manager/Officer
+  screens/VillagerShell.tsx      Villager conflict-report flow
+  App.tsx                        Session gate + role routing
+```
+
+### Addresses
+
+The app finds the API on its own (`src/api/baseUrl.ts`). Two overrides exist
+in `frontend/mobile/.env` if it cannot:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://<your-pc-lan-ip>:5055   # API
+EXPO_PUBLIC_WEB_UI_URL=http://<your-pc-lan-ip>:5173     # dashboard (Manager/Officer)
+```
+
+The dashboard address defaults to the Metro host on port 5173, which is where
+`npm run web` serves it.
+
+### Tests
+
+```bash
+npm run test -w backend            # includes tests/auth.test.js
+npm run test -w frontend/mobile    # role routing + stored session shape
+npm run typecheck -w frontend/mobile
+```
+
+`tests/auth.test.js` covers login (all four roles, missing fields, wrong
+password answering the same as an unknown phone) and `/me` (valid token, no
+token, bad token, deleted account).

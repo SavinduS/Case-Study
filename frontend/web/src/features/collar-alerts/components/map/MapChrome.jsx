@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 /** Live park clock, top-left of the map. */
 export function ClockChip({ time }) {
   return (
-    <div className="pointer-events-none absolute left-16 top-4 z-[700] rounded-md bg-white/95 px-3 py-1.5 shadow">
-      <span className="font-mono text-lg font-semibold leading-none text-stone-800">{time}</span>
+    <div className="pointer-events-none absolute left-3 top-14 z-[700] rounded-md bg-white/95 px-2.5 py-1
+        shadow lg:left-16 lg:top-4 lg:px-3 lg:py-1.5">
+      <span className="font-mono text-base font-semibold leading-none text-stone-800 lg:text-lg">{time}</span>
     </div>
   );
 }
@@ -15,7 +16,8 @@ export function ClockChip({ time }) {
  */
 export function StatusChips({ signalLost = false, visibleZoneCount = 0, totalZoneCount = 0 }) {
   return (
-    <div className="pointer-events-none absolute right-[22.5rem] top-4 z-[700] flex flex-col items-end gap-2">
+    <div className="pointer-events-none absolute right-3 top-14 z-[700] flex flex-col items-end gap-1.5
+        text-[11px] lg:right-[22.5rem] lg:top-4 lg:gap-2 lg:text-xs">
       <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow">
         <span className={`h-2 w-2 rounded-full ${signalLost ? 'bg-alert-600' : 'bg-moss-500'}`} />
         {signalLost ? 'Data Ingestion Interrupted' : 'Data Ingestion Active'}
@@ -31,6 +33,13 @@ export function StatusChips({ signalLost = false, visibleZoneCount = 0, totalZon
   );
 }
 
+// Leaflet's zoom control is desktop-only (see DashboardMap), so narrow screens
+// get an equivalent pair inside the control stack instead.
+const MOBILE_CONTROLS = [
+  { key: 'zoomIn', label: 'Zoom in', path: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z' },
+  { key: 'zoomOut', label: 'Zoom out', path: 'M5 11h14v2H5v-2Z' }
+];
+
 const CONTROLS = [
   { key: 'settings', label: 'Map settings', path: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z' },
   { key: 'locate', label: 'Centre on breach', path: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-6 3 3h-2v3h-2V5H9l3-3Z' },
@@ -41,7 +50,7 @@ const CONTROLS = [
 /** Right-hand control stack from the high-fidelity wireframe. */
 export function ControlStack({ onAction }) {
   return (
-    <div className="absolute right-[22.5rem] top-4 z-[700] flex flex-col gap-2">
+    <div className="absolute right-3 top-32 z-[700] flex flex-col gap-2 lg:right-[22.5rem] lg:top-4">
       {CONTROLS.map((control) => (
         <button
           key={control.key}
@@ -50,6 +59,20 @@ export function ControlStack({ onAction }) {
           aria-label={control.label}
           onClick={() => onAction?.(control.key)}
           className="grid h-9 w-9 place-items-center rounded-md bg-white/95 text-park-900 shadow transition-colors hover:bg-white"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d={control.path} />
+          </svg>
+        </button>
+      ))}
+      {MOBILE_CONTROLS.map((control) => (
+        <button
+          key={control.key}
+          type="button"
+          title={control.label}
+          aria-label={control.label}
+          onClick={() => onAction?.(control.key)}
+          className="grid h-9 w-9 place-items-center rounded-md bg-white/95 text-park-900 shadow transition-colors hover:bg-white lg:hidden"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d={control.path} />
