@@ -15,8 +15,9 @@ import useAlertAlarm from '../hooks/useAlertAlarm.js';
 import { formatGmtStamp } from '../domain/labels.js';
 
 // Modules this use case owns and therefore can actually open, mirroring the
-// owned entries in the shared rail.
-const OWNED_MODULES = RAIL.filter((item) => !item.owner);
+// owned entries in the shared rail. Entries with a `to` are links out of the
+// dashboard rather than panels on the map, so they are not mirrored here.
+const OWNED_MODULES = RAIL.filter((item) => !item.owner && !item.to);
 
 const MODULE_OWNERS = {
   incidents: {
@@ -24,21 +25,7 @@ const MODULE_OWNERS = {
     owner: 'Mandinu R P S (IT23610620)',
     useCaseName: 'Log Field Incident Offline (New)',
     description:
-      'Rangers record snares, carcasses and illegal campsites offline and the record synchronises when connectivity returns.'
-  },
-  patrol: {
-    title: 'Patrol planning',
-    owner: 'Wijesingha S M (IT23538214)',
-    useCaseName: 'Park Management and Patrol Analytics Reports',
-    description:
-      'Patrol route assignment, coverage statistics and drill-down into terrain zones used to allocate ranger staff.'
-  },
-  cameras: {
-    title: 'Camera trap review',
-    owner: 'Not covered by the group design',
-    useCaseName: 'Referenced in the case study only',
-    description:
-      'The case study mentions motion-triggered camera traps, but no member owns a use case for reviewing their uploads.'
+'Rangers record snares, carcasses and illegal campsites offline and the record synchronises when connectivity returns.'
   }
 };
 
