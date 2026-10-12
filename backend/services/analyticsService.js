@@ -93,12 +93,49 @@ function isoWeek(date) {
   return `${isoYear}-W${String(week).padStart(2, '0')}`;
 }
 
-function configuredHours() {
+// Management patrol target per zone. Primary source is the ZoneSetting
+// collection (Zone settings page); server env stays as deployment fallback.
+const DEFAULT_REQUIRED_HOURS = 8;
+
+function envRequiredHours() {
+  const base = Object.fromEntries(SECTORS.map((s) => [s.code, null]));
   try {
     const value = process.env.REQUIRED_SECTOR_HOURS;
-    if (value) return { ...Object.fromEntries(SECTORS.map((s) => [s.code, 0])), ...JSON.parse(value) };
-  } catch { /* use defaults */ }
-  return Object.fromEntries(SECTORS.map((s) => [s.code, Number(process.env[`REQUIRED_HOURS_${s.code}`] || 0)]));
+    if (value) return { ...base, ...JSON.parse(value) };
+  } catch { /* fall through to per-zone vars */ }
+  SECTORS.forEach((s) => {
+    const raw = process.env[`REQUIRED_HOURS_${s.code}`];
+    if (raw !== undefined && raw !== '') base[s.code] = Number(raw);
+  });
+  return base;
+}
+
+function mergeRequiredHours(dbDocs, envMap) {
+  const merged = {};
+  SECTORS.forEach((s) => {
+    const fromDb = dbDocs.find((d) => normalizeSectorCode(d.code) === s.code);
+    const dbValue = fromDb ? Number(fromDb.requiredHours) : NaN;
+    const envValue = envMap ? Number(envMap[s.code]) : NaN;
+    merged[s.code] = Number.isFinite(dbValue)
+      ? dbValue
+      : (Number.isFinite(envValue) ? envValue : DEFAULT_REQUIRED_HOURS);
+  });
+  return merged;
+}
+
+async function getRequiredHours() {
+  try {
+    const ZoneSetting = require('../models/ZoneSetting');
+    const docs = await ZoneSetting.find({}).lean();
+    return mergeRequiredHours(docs, envRequiredHours());
+  } catch {
+    return mergeRequiredHours([], envRequiredHours());
+  }
+}
+
+// Kept for backwards compatibility (tests / callers without DB access).
+function configuredHours() {
+  return mergeRequiredHours([], envRequiredHours());
 }
 
 function dateKey(date) { return new Date(date).toISOString().slice(0, 10); }
@@ -191,7 +228,7 @@ async function generateAnalytics(rawCriteria, userId) {
   const zones = criteria.zones.length ? criteria.zones : SECTORS.map((s) => s.code);
   const current = aggregate(incidents, patrols, zones, criteria.startDate, criteria.endExclusive);
   const counts = current.counts; const hours = current.hours; const weekly = current.weekly;
-  const required = configuredHours();
+  const required = await getRequiredHours();
   const coverage = zones.map((z) => ({
     [z]: { requiredHours: Number(required[z] || 0), actualHours: Number(hours[z].toFixed(2)),
       coveragePercent: required[z] ? Number(Math.min(100, (hours[z] / required[z]) * 100).toFixed(2)) : null }
@@ -259,6 +296,7 @@ async function generateAnalytics(rawCriteria, userId) {
   return report;
 }
 
+<<<<<<< Updated upstream
 // The internals are exported so the formulas this module is responsible for
 // can be tested directly instead of only through generateAnalytics, which
 // would need database fixtures for every arithmetic edge case.
@@ -276,3 +314,6 @@ module.exports = {
   isoWeek,
   toAnalyticsIncident
 };
+=======
+module.exports = { parseCriteria, generateAnalytics, incidentCategories, sectorForIncident, noData, getRequiredHours, mergeRequiredHours, DEFAULT_REQUIRED_HOURS };
+>>>>>>> Stashed changes

@@ -4,7 +4,12 @@ import DashboardPage from './features/collar-alerts/pages/DashboardPage.jsx';
 import PortalModuleRoute from './pages/PortalModuleRoute.jsx';
 import ReportsPage from './features/reports/pages/ReportsPage.jsx';
 import SavedReportsPage from './features/reports/pages/SavedReportsPage.jsx';
+<<<<<<< Updated upstream
 import ManagerShell from './features/reports/components/ManagerShell.jsx';
+=======
+import ZoneSettingsPage from './features/reports/pages/ZoneSettingsPage.jsx';
+import AnalyticsShell from './features/reports/components/AnalyticsShell.jsx';
+>>>>>>> Stashed changes
 import ComparisonPage from './features/reports/pages/ComparisonPage.jsx';
 
 /**
@@ -34,6 +39,7 @@ export default function App() {
         <Topbar />
         <main className="relative min-h-0 flex-1">
           <Routes>
+<<<<<<< Updated upstream
             <Route path="/" element={<DashboardPage />} />
             <Route path="/data-logs" element={<PortalModuleRoute moduleKey="data-logs" />} />
             <Route path="/map-view" element={<PortalModuleRoute moduleKey="map-view" />} />
@@ -41,6 +47,13 @@ export default function App() {
             <Route path="/reports/saved" element={<SavedReportsPage />} />
             <Route path="/admin" element={<PortalModuleRoute moduleKey="admin" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+=======
+            <Route path="/analytics/type" element={<ReportsPage />} />
+            <Route path="/analytics/comparison" element={<ComparisonPage />} />
+            <Route path="/analytics/saved" element={<SavedReportsPage />} />
+            <Route path="/analytics/zones" element={<ZoneSettingsPage />} />
+            <Route path="*" element={home} />
+>>>>>>> Stashed changes
           </Routes>
         </main>
       </div>}

@@ -13,7 +13,13 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
+<<<<<<< Updated upstream
       "<rootDir>/tests/*.test.js"
+=======
+      "<rootDir>/tests/*.test.js",
+      "<rootDir>/tests/analytics/*.test.js",
+      "<rootDir>/tests/conflict-report-submit-villager/*.test.js"
+>>>>>>> Stashed changes
     ],
     "setupFiles": [
       "<rootDir>/tests/setupEnv.js"
@@ -26,7 +32,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb-connection-string-url": "^3.0.2",
     "mongoose": "^8.4.0",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "pdfkit": "^0.20.2"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.8",
