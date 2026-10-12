@@ -91,7 +91,7 @@ export default function SubmitReportScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScreenHeader
-        title="Submit Conflict Report"
+        title="Report Conflict"
         right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
       />
       <ScrollView
@@ -135,19 +135,19 @@ export default function SubmitReportScreen({
           disabled={submitting}
           onChange={onPhotoChange}
         />
+      </ScrollView>
 
-        <View style={styles.submitBlock}>
-          <PrimaryButton
-            label="Submit Report"
-            onPress={handleSubmit}
-            loading={submitting}
-            disabled={submitting}
-          />
-        </View>
+      <View style={styles.footer}>
+        <PrimaryButton
+          label="Submit Report"
+          onPress={handleSubmit}
+          loading={submitting}
+          disabled={submitting}
+        />
         <Text style={styles.footnote}>
           Your report will be confirmed after it is received by the system.
         </Text>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -158,11 +158,14 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xl,
     backgroundColor: colors.bg
   },
-  submitBlock: {
-    marginTop: spacing.lg
+  footer: {
+    padding: spacing.md,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.bg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border
   },
   label: {
     color: colors.text,

@@ -7,6 +7,9 @@ export interface AuthSession {
   name: string;
   role: UserRole;
   token: string;
+  /** Contact details for the profile screen; absent on older servers/sessions. */
+  phone?: string;
+  email?: string;
 }
 
 /**

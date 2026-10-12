@@ -211,7 +211,7 @@ describe('GET /api/auth/me (session restore on app start)', () => {
       .set('Authorization', `Bearer ${created.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: created.id, name: 'Kamal', role: 'officer' });
+    expect(res.body).toEqual({ id: created.id, name: 'Kamal', role: 'officer', phone: created.phone });
   });
 
   test('rejects a missing or unusable token', async () => {
@@ -228,5 +228,67 @@ describe('GET /api/auth/me (session restore on app start)', () => {
       .set('Authorization', `Bearer ${created.token}`);
 
     expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/register/villager (public mobile sign-up)', () => {
+  async function signUp(overrides = {}) {
+    phoneCounter += 1;
+    const phone = `+9471${String(phoneCounter).padStart(8, '0')}`;
+    const res = await request(app).post('/api/auth/register/villager').send({
+      name: 'Soma Silva',
+      phone,
+      password: 'secret123',
+      ...overrides
+    });
+    return { res, phone };
+  }
+
+  test('creates a villager account and returns a usable session', async () => {
+    const { res, phone } = await signUp({ email: 'soma@example.com' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('Soma Silva');
+    expect(res.body.phone).toBe(phone);
+    expect(res.body.email).toBe('soma@example.com');
+    expect(res.body.role).toBe('villager');
+    expect(res.body.token).toEqual(expect.any(String));
+
+    const stored = await User.findById(res.body.id).lean();
+    expect(stored.role).toBe('villager');
+
+    const loginRes = await login(phone, 'secret123');
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.role).toBe('villager');
+  });
+
+  test('ignores any role sent in the body — always a villager', async () => {
+    const { res } = await signUp({ role: 'officer' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.role).toBe('villager');
+    const stored = await User.findById(res.body.id).lean();
+    expect(stored.role).toBe('villager');
+  });
+
+  test('refuses a duplicate phone number', async () => {
+    const { phone } = await signUp();
+    const second = await request(app).post('/api/auth/register/villager').send({
+      name: 'Copycat',
+      phone,
+      password: 'secret123'
+    });
+
+    expect(second.status).toBe(409);
+  });
+
+  test('rejects a short password and missing fields', async () => {
+    const short = await signUp({ password: 'abc' });
+    expect(short.res.status).toBe(400);
+
+    const missing = await request(app)
+      .post('/api/auth/register/villager')
+      .send({ name: 'No Phone' });
+    expect(missing.status).toBe(400);
   });
 });

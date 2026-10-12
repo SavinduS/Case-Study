@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 export interface TabBarTab {
   id: string;
@@ -15,11 +15,13 @@ export const RANGER_TABS: TabBarTab[] = [
   { id: 'myIncidents', icon: '📋', label: 'My Incidents' }
 ];
 
-/** Villager: raise a conflict report, then track the reports sent from this phone. */
+/** Villager: raise a conflict report, track the reports sent from this phone,
+ * follow the SMS guide, and view the signed-in account. */
 export const VILLAGER_TABS: TabBarTab[] = [
   { id: 'submit', icon: '🐘', label: 'Report Conflict' },
   { id: 'myReports', icon: '📄', label: 'My Reports' },
-  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' }
+  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' },
+  { id: 'profile', icon: '👤', label: 'My Profile' }
 ];
 
 interface Props {
@@ -45,8 +47,10 @@ export default function TabBar({ tabs, active, onSelect, onSignOut }: Props) {
             onPress={() => onSelect(tab.id)}
             style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
           >
-            <Text style={[styles.icon, isActive && styles.activeText]}>{tab.icon}</Text>
-            <Text style={[styles.label, isActive && styles.activeText]}>{tab.label}</Text>
+            <View style={[styles.pill, isActive && styles.pillActive]}>
+              <Text style={[styles.icon, isActive && styles.activeText]}>{tab.icon}</Text>
+              <Text style={[styles.label, isActive && styles.activeText]}>{tab.label}</Text>
+            </View>
           </Pressable>
         );
       })}
@@ -81,6 +85,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6
+  },
+  pill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.lg
+  },
+  pillActive: {
+    backgroundColor: colors.primarySoft
   },
   icon: {
     fontSize: 18

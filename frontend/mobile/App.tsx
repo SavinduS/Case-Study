@@ -5,7 +5,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets
 } from 'react-native-safe-area-context';
-import { fetchMe, login as apiLogin, NetworkError } from './src/api/client';
+import { fetchMe, login as apiLogin, NetworkError, registerVillager } from './src/api/client';
 import { destinationForRole } from './src/auth/roles';
 import { clearSession, loadSession, saveSession } from './src/auth/session';
 import type { AuthSession } from './src/auth/types';
@@ -14,6 +14,7 @@ import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import MyIncidentsScreen, { StoredFieldIncident } from './src/screens/MyIncidentsScreen';
 import NewFieldIncidentScreen from './src/screens/NewFieldIncidentScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 import ReviewIncidentScreen from './src/screens/ReviewIncidentScreen';
 import SubmitResultScreen from './src/screens/SubmitResultScreen';
 import VillagerShell from './src/screens/VillagerShell';
@@ -93,6 +94,7 @@ function SafeFrame({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const [boot, setBoot] = useState<BootState>('checking');
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'register'>('login');
 
   // Restore the previous session. An expired token or a removed account drops
   // back to the login screen instead of opening a UI the user may not have
@@ -110,7 +112,14 @@ function AppContent() {
       try {
         const user = await fetchMe(stored.token);
         if (cancelled) return;
-        const refreshed: AuthSession = { ...stored, id: user.id, name: user.name, role: user.role };
+        const refreshed: AuthSession = {
+          ...stored,
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+          email: user.email
+        };
         await saveSession(refreshed);
         setSession(refreshed);
         setBoot('signedIn');
@@ -139,6 +148,19 @@ function AppContent() {
     return user;
   }, []);
 
+  // Villager self sign-up: the server always creates a villager, so the
+  // response goes through the same save-and-route path as signing in.
+  const handleRegister = useCallback(
+    async (input: { name: string; phone: string; password: string; email?: string }) => {
+      const user = await registerVillager(input);
+      await saveSession(user);
+      setSession(user);
+      setBoot('signedIn');
+      return user;
+    },
+    []
+  );
+
   const handleSignOut = useCallback(async () => {
     await clearSession();
     setSession(null);
@@ -158,7 +180,17 @@ function AppContent() {
   if (boot === 'signedOut' || !session) {
     return (
       <SafeFrame>
-        <LoginScreen onSubmit={handleLogin} />
+        {authView === 'register' ? (
+          <RegisterScreen
+            onSubmit={handleRegister}
+            onBackToSignIn={() => setAuthView('login')}
+          />
+        ) : (
+          <LoginScreen
+            onSubmit={handleLogin}
+            onRegister={() => setAuthView('register')}
+          />
+        )}
       </SafeFrame>
     );
   }
@@ -176,7 +208,7 @@ function AppContent() {
   if (session.role === 'villager') {
     return (
       <SafeFrame>
-        <VillagerShell onSignOut={() => void handleSignOut()} />
+        <VillagerShell user={session} onSignOut={() => void handleSignOut()} />
       </SafeFrame>
     );
   }

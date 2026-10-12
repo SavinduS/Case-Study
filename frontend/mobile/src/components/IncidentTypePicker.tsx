@@ -1,12 +1,19 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { INCIDENT_LABELS, INCIDENT_TYPE_ORDER } from '../constants/incidentTypes';
+import {
+  INCIDENT_ICONS,
+  INCIDENT_LABELS,
+  INCIDENT_TYPE_ORDER
+} from '../constants/incidentTypes';
 import { colors, font, radius, spacing } from '../theme';
 import type { IncidentType } from '../types';
 
-const OPTIONS: { value: IncidentType; label: string }[] = INCIDENT_TYPE_ORDER.map(
-  (value) => ({ value, label: INCIDENT_LABELS[value] })
-);
+const OPTIONS: { value: IncidentType; label: string; icon: string }[] =
+  INCIDENT_TYPE_ORDER.map((value) => ({
+    value,
+    label: INCIDENT_LABELS[value],
+    icon: INCIDENT_ICONS[value]
+  }));
 
 interface Props {
   value: IncidentType | null;
@@ -25,11 +32,16 @@ export default function IncidentTypePicker({ value, onChange }: Props) {
             accessibilityState={{ checked: selected }}
             accessibilityLabel={option.label}
             onPress={() => onChange(option.value)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            style={({ pressed }) => [
+              styles.row,
+              selected && styles.rowSelected,
+              pressed && styles.rowPressed
+            ]}
           >
             <View style={[styles.radio, selected && styles.radioSelected]}>
               {selected ? <View style={styles.radioDot} /> : null}
             </View>
+            <Text style={styles.icon}>{option.icon}</Text>
             <Text style={styles.label}>{option.label}</Text>
           </Pressable>
         );
@@ -54,6 +66,13 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     backgroundColor: colors.primarySoft
+  },
+  rowSelected: {
+    backgroundColor: colors.primarySoft
+  },
+  icon: {
+    fontSize: font.body,
+    marginRight: spacing.sm
   },
   radio: {
     width: 22,
