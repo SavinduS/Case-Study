@@ -5,7 +5,7 @@
   "scripts": {
     "start": "expo start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/features/fieldIncident/__tests__/validateFieldIncident.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -24,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/react": "~19.2.4",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^2.1.9"
   }
 }

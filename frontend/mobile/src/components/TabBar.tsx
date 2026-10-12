@@ -3,23 +3,37 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
-export type TabId = 'report' | 'myIncidents';
-
-interface Props {
-  active: TabId;
-  onSelect: (tab: TabId) => void;
+export interface TabBarTab {
+  id: string;
+  icon: string;
+  label: string;
 }
 
-const TABS: { id: TabId; icon: string; label: string }[] = [
+/** Ranger: capture an incident in the field, then review what is still on the device. */
+export const RANGER_TABS: TabBarTab[] = [
   { id: 'report', icon: '📝', label: 'Report Incident' },
   { id: 'myIncidents', icon: '📋', label: 'My Incidents' }
 ];
 
-export default function TabBar({ active, onSelect }: Props) {
+/** Villager: raise a conflict report, then track the reports sent from this phone. */
+export const VILLAGER_TABS: TabBarTab[] = [
+  { id: 'submit', icon: '🐘', label: 'Report Conflict' },
+  { id: 'myReports', icon: '📄', label: 'My Reports' }
+];
+
+interface Props {
+  tabs: TabBarTab[];
+  active: string;
+  onSelect: (id: string) => void;
+  /** Shown on the right of the bar so a signed-in user can always sign out. */
+  onSignOut?: () => void;
+}
+
+export default function TabBar({ tabs, active, onSelect, onSignOut }: Props) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = tab.id === active;
         return (
           <Pressable
@@ -35,6 +49,17 @@ export default function TabBar({ active, onSelect }: Props) {
           </Pressable>
         );
       })}
+      {onSignOut ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          onPress={onSignOut}
+          style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
+        >
+          <Text style={[styles.icon, styles.activeText]}>🚪</Text>
+          <Text style={[styles.label, styles.activeText]}>Sign out</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

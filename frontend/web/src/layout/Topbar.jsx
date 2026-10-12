@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import useIsDesktop from '../features/collar-alerts/hooks/useIsDesktop.js';
+import usePortalSession from './usePortalSession.js';
+import { initialsOf, isEmbedded, roleLabel, signOut } from '../services/session.js';
 import Sidebar, { RAIL } from './Sidebar.jsx';
 
 const NAV = [
@@ -16,16 +18,31 @@ const NAV = [
  * band, wordmark, tab navigation with an active pill, and the signed-in
  * Operations Officer on the right.
  *
+ * The signed-in person comes from the session the mobile app hands over, or
+ * from a sign-in in this browser (see services/session.js). Sign out clears it
+ * and returns to the sign-in page — or, inside the app, sends the phone back
+ * to its own login screen.
+ *
  * On a phone the tab strip cannot fit, so it collapses into a hamburger that
  * opens a sheet holding the same navigation plus the module rail.
  */
 export default function Topbar() {
   const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { session } = usePortalSession();
 
   useEffect(() => {
     if (isDesktop) setMenuOpen(false);
   }, [isDesktop]);
+
+  function handleSignOut() {
+    // Clears the session here and tells the app, which returns to its login.
+    // In a browser there is no app, so this page goes to the sign-in page.
+    signOut();
+    if (isEmbedded()) return;
+    navigate('/login', { replace: true });
+  }
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -93,12 +110,28 @@ export default function Topbar() {
       <div className="ml-auto flex items-center gap-2 pr-3 lg:gap-3 lg:pr-0">
         <span className="hidden h-8 w-px bg-white/20 lg:block" aria-hidden="true" />
         <span className="grid h-8 w-8 place-items-center rounded-full bg-moss-500 text-xs font-bold lg:h-9 lg:w-9 lg:text-sm">
-          OO
+          {session ? initialsOf(session.name) : 'OO'}
         </span>
-        <span className="hidden text-sm font-semibold sm:inline">Operations Officer</span>
-        <svg className="h-4 w-4 text-white/70" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path d="M5.5 7.5 10 12l4.5-4.5H5.5Z" />
-        </svg>
+        <span className="hidden text-sm font-semibold sm:inline">{roleLabel(session)}</span>
+        <span className="hidden max-w-[10rem] truncate text-sm text-white/60 lg:inline">
+          {session ? session.name : ''}
+        </span>
+        {/* The app's guard sends anyone without a session to the sign-in
+            page, so here there is always something to sign out of. */}
+        {session ? (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="ml-1 shrink-0 rounded-md border border-white/30 bg-white/10 px-3 py-1.5
+              text-sm font-semibold text-white transition-colors hover:bg-white/20"
+          >
+            Sign out
+          </button>
+        ) : (
+          <svg className="h-4 w-4 text-white/70" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M5.5 7.5 10 12l4.5-4.5H5.5Z" />
+          </svg>
+        )}
       </div>
 
       {menuOpen && (
