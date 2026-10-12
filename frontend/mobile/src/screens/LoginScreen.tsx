@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,12 +8,12 @@ import {
   Text,
   TextInput,
   useWindowDimensions,
-  View
-} from 'react-native';
-import PrimaryButton from '../components/PrimaryButton';
-import StatusBanner from '../components/StatusBanner';
-import { colors, font, spacing } from '../theme';
-import type { AuthSession } from '../auth/types';
+  View,
+} from "react-native";
+import PrimaryButton from "../components/PrimaryButton";
+import StatusBanner from "../components/StatusBanner";
+import { colors, font, spacing } from "../theme";
+import type { AuthSession } from "../auth/types";
 
 interface Props {
   /** Resolves the signed-in user, or rejects with an Error carrying the reason. */
@@ -42,24 +42,30 @@ export function isEmailOrPhone(value: string): boolean {
   return EMAIL_PATTERN.test(trimmed) || PHONE_PATTERN.test(trimmed);
 }
 
-function validate(identifier: string, password: string): Record<string, string> {
+function validate(
+  identifier: string,
+  password: string,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!identifier.trim()) {
-    errors.identifier = 'Enter your email address or phone number.';
+    errors.identifier = "Enter your email address or phone number.";
   } else if (!isEmailOrPhone(identifier)) {
-    errors.identifier = 'Enter a valid email address or phone number.';
+    errors.identifier = "Enter a valid email address or phone number.";
   }
   if (!password) {
-    errors.password = 'Enter your password.';
+    errors.password = "Enter your password.";
   } else if (password.length < 6) {
-    errors.password = 'Password must be at least 6 characters.';
+    errors.password = "Password must be at least 6 characters.";
   }
   return errors;
 }
 
 function useCardMetrics() {
   const { height } = useWindowDimensions();
-  const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, height / REFERENCE_HEIGHT));
+  const scale = Math.min(
+    MAX_SCALE,
+    Math.max(MIN_SCALE, height / REFERENCE_HEIGHT),
+  );
   return {
     scale,
     brandPad: Math.round(24 * scale),
@@ -69,15 +75,14 @@ function useCardMetrics() {
     welcome: Math.round(28 * scale),
     fieldGap: Math.round(12 * scale),
     field: Math.max(MIN_TOUCH, Math.round(52 * scale)),
-    buttonGap: Math.round(20 * scale)
+    buttonGap: Math.round(20 * scale),
   };
 }
 
-
 export default function LoginScreen({ onSubmit, onRegister }: Props) {
   const m = useCardMetrics();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -94,8 +99,10 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
       await onSubmit(identifier.trim(), password);
       // On success the app swaps this screen out; nothing to render here.
     } catch (e) {
-      setFailure(e instanceof Error ? e.message : 'Sign in failed. Please try again.');
-      setPassword('');
+      setFailure(
+        e instanceof Error ? e.message : "Sign in failed. Please try again.",
+      );
+      setPassword("");
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +111,7 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.page}
@@ -123,23 +130,35 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
             <View
               style={[
                 styles.logo,
-                { width: m.logo, height: m.logo, borderRadius: m.logo / 2 }
+                { width: m.logo, height: m.logo, borderRadius: m.logo / 2 },
               ]}
             >
-              <Text style={[styles.logoMark, { fontSize: m.logo * 0.36 }]}>W</Text>
+              <Text style={[styles.logoMark, { fontSize: m.logo * 0.36 }]}>
+                W
+              </Text>
             </View>
-            <Text style={[styles.wordmark, { fontSize: m.wordmark }]}>WILDLIFE</Text>
+            <Text style={[styles.wordmark, { fontSize: m.wordmark }]}>
+              WILDLIFE
+            </Text>
             <Text style={styles.wordmarkSub}>Conservation portal</Text>
           </View>
 
           {/* Form block */}
           <View style={[styles.body, { paddingVertical: m.bodyPad }]}>
-            <Text style={[styles.welcome, { fontSize: m.welcome }]}>welcome</Text>
-            <Text style={styles.tagline}>Sign in to open the screens for your role</Text>
+            <Text style={[styles.welcome, { fontSize: m.welcome }]}>
+              welcome
+            </Text>
+            <Text style={styles.tagline}>
+              Sign in to open the screens for your role
+            </Text>
 
             {failure ? (
               <View style={styles.bannerWrap}>
-                <StatusBanner tone="error" title="Could not sign in" message={failure} />
+                <StatusBanner
+                  tone="error"
+                  title="Could not sign in"
+                  message={failure}
+                />
               </View>
             ) : null}
 
@@ -149,14 +168,14 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
                 {
                   marginTop: m.fieldGap,
                   minHeight: m.field,
-                  borderRadius: m.field / 2
+                  borderRadius: m.field / 2,
                 },
-                errors.identifier ? styles.inputError : null
+                errors.identifier ? styles.inputError : null,
               ]}
               value={identifier}
               onChangeText={(value) => {
                 setIdentifier(value);
-                setErrors((prev) => ({ ...prev, identifier: '' }));
+                setErrors((prev) => ({ ...prev, identifier: "" }));
               }}
               placeholder="Email or phone number"
               placeholderTextColor={colors.textMuted}
@@ -179,15 +198,15 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
                   {
                     marginTop: m.fieldGap,
                     minHeight: m.field,
-                    borderRadius: m.field / 2
+                    borderRadius: m.field / 2,
                   },
                   styles.passwordInput,
-                  errors.password ? styles.inputError : null
+                  errors.password ? styles.inputError : null,
                 ]}
                 value={password}
                 onChangeText={(value) => {
                   setPassword(value);
-                  setErrors((prev) => ({ ...prev, password: '' }));
+                  setErrors((prev) => ({ ...prev, password: "" }));
                 }}
                 placeholder="Password"
                 placeholderTextColor={colors.textMuted}
@@ -201,19 +220,25 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
               />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                accessibilityLabel={
+                  showPassword ? "Hide password" : "Show password"
+                }
                 accessibilityState={{ selected: showPassword }}
                 onPress={() => setShowPassword((prev) => !prev)}
                 style={({ pressed }) => [
                   styles.reveal,
                   { top: m.fieldGap, minHeight: m.field },
-                  pressed && styles.pressed
+                  pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.revealText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                <Text style={styles.revealText}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
               </Pressable>
             </View>
-            {errors.password ? <Text style={styles.error}>{errors.password}</Text> : null}
+            {errors.password ? (
+              <Text style={styles.error}>{errors.password}</Text>
+            ) : null}
 
             <View style={{ marginTop: m.buttonGap }}>
               <PrimaryButton
@@ -233,10 +258,14 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
             accessibilityLabel="Create a villager account"
             onPress={onRegister}
             disabled={submitting}
-            style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.footerLink,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.footerText}>
-              New villager? <Text style={styles.footerAccent}>Create an account</Text>
+              New villager?{" "}
+              <Text style={styles.footerAccent}>Create an account</Text>
             </Text>
           </Pressable>
         ) : null}
@@ -247,94 +276,94 @@ export default function LoginScreen({ onSubmit, onRegister }: Props) {
 
 const styles = StyleSheet.create({
   flex: {
-    flex: 1
+    flex: 1,
   },
   page: {
     flexGrow: 1,
-    backgroundColor: colors.surface
+    backgroundColor: colors.surface,
   },
   // The screen IS the card: the green block on top, the form filling the rest
   // to the bottom edge. No floating card, nothing floating in empty space.
   card: {
     flexGrow: 1,
-    backgroundColor: colors.surface
+    backgroundColor: colors.surface,
   },
   brand: {
     // Shares the screen with the form (the same split as the web sign-in):
     // both panels grow, so neither leaves a large empty area.
     flexGrow: 1,
     flexShrink: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     // Keeps the decorative circles inside the green block
-    overflow: 'hidden',
+    overflow: "hidden",
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
   },
-// Decorative circles that run off the edges of the green block. Kept faint so
-// the wordmark stays the clearest thing on the panel.
-blobTopRight: {
-    position: 'absolute',
+  // Decorative circles that run off the edges of the green block. Kept faint so
+  // the wordmark stays the clearest thing on the panel.
+  blobTopRight: {
+    position: "absolute",
     top: -100,
     right: -80,
     width: 230,
     height: 230,
     borderRadius: 115,
     backgroundColor: colors.primaryDark,
-    opacity: 0.45
+    opacity: 0.45,
   },
-blobBottomLeft: {
-    position: 'absolute',
+  blobBottomLeft: {
+    position: "absolute",
     bottom: -120,
     left: -70,
     width: 210,
     height: 210,
     borderRadius: 105,
     backgroundColor: colors.primaryDark,
-    opacity: 0.3
+    opacity: 0.3,
   },
   logo: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
   },
   logoMark: {
     color: colors.primaryDark,
-    fontWeight: '800'
+    fontWeight: "800",
   },
   wordmark: {
     marginTop: spacing.md,
     color: colors.white,
-    fontWeight: '800',
-    letterSpacing: 3
+    fontWeight: "800",
+    letterSpacing: 3,
   },
   wordmarkSub: {
     marginTop: 2,
     color: colors.primarySoft,
     fontSize: font.tiny,
-    letterSpacing: 2
+    letterSpacing: 2,
   },
   /* Slightly more of the screen than the brand block, since the form has more
      to hold; both centre their content in the space they get. */
   body: {
     flexGrow: 1.15,
     flexShrink: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
   },
   welcome: {
     color: colors.primary,
-    fontWeight: '800',
-    textAlign: 'center'
+    fontWeight: "800",
+    textAlign: "center",
   },
   tagline: {
     marginTop: spacing.xs,
     color: colors.textMuted,
     fontSize: font.small,
-    textAlign: 'center'
+    textAlign: "center",
   },
   bannerWrap: {
-    marginTop: spacing.md
+    marginTop: spacing.md,
   },
   input: {
     paddingHorizontal: spacing.lg,
@@ -342,54 +371,54 @@ blobBottomLeft: {
     color: colors.text,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: 'transparent'
+    borderColor: "transparent",
   },
   inputError: {
     borderColor: colors.danger,
-    backgroundColor: colors.dangerSoft
+    backgroundColor: colors.dangerSoft,
   },
   passwordBlock: {
-    justifyContent: 'center'
+    justifyContent: "center",
   },
   // Leaves room for the Show/Hide control inside the field
   passwordInput: {
-    paddingRight: 72
+    paddingRight: 72,
   },
   reveal: {
-    position: 'absolute',
+    position: "absolute",
     right: spacing.md,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
   },
   revealText: {
     color: colors.primary,
     fontSize: font.small,
-    fontWeight: '700'
+    fontWeight: "700",
   },
   pressed: {
-    opacity: 0.6
+    opacity: 0.6,
   },
   error: {
     marginTop: spacing.xs,
     color: colors.danger,
-    fontSize: font.tiny
+    fontSize: font.tiny,
   },
   submitBlock: {
-    marginTop: spacing.xs
+    marginTop: spacing.xs,
   },
   footerLink: {
     minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.md,
   },
   footerText: {
     color: colors.textMuted,
-    fontSize: font.body
+    fontSize: font.body,
   },
   footerAccent: {
     color: colors.primary,
-    fontWeight: '700'
-  }
-  pill: {}
+    fontWeight: "700",
+  },
+  pill: {},
 });
