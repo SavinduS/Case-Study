@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
+import { validateRegisterForm } from '../auth/registerValidation';
 import { colors, font, radius, spacing } from '../theme';
 import type { AuthSession } from '../auth/types';
 
@@ -25,40 +26,6 @@ interface Props {
   onBackToSignIn: () => void;
 }
 
-// Same permissive shapes the backend accepts: catch typos, not RFC arguments.
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_PATTERN = /^\+?[0-9\s-]{7,20}$/;
-
-function validate(input: {
-  name: string;
-  phone: string;
-  email: string;
-  password: string;
-  confirm: string;
-}): Record<string, string> {
-  const errors: Record<string, string> = {};
-  if (!input.name.trim()) {
-    errors.name = 'Enter your full name.';
-  }
-  if (!input.phone.trim()) {
-    errors.phone = 'Enter your phone number.';
-  } else if (!PHONE_PATTERN.test(input.phone.trim())) {
-    errors.phone = 'Enter a valid phone number (digits, + at most).';
-  }
-  if (input.email.trim() && !EMAIL_PATTERN.test(input.email.trim())) {
-    errors.email = 'Enter a valid email address, or leave it empty.';
-  }
-  if (!input.password) {
-    errors.password = 'Choose a password.';
-  } else if (input.password.length < 6) {
-    errors.password = 'Password must be at least 6 characters.';
-  }
-  if (input.confirm !== input.password) {
-    errors.confirm = 'The two passwords do not match.';
-  }
-  return errors;
-}
-
 export default function RegisterScreen({ onSubmit, onBackToSignIn }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -70,7 +37,7 @@ export default function RegisterScreen({ onSubmit, onBackToSignIn }: Props) {
   const [failure, setFailure] = useState<string | null>(null);
 
   async function handleRegister() {
-    const nextErrors = validate({ name, phone, email, password, confirm });
+    const nextErrors = validateRegisterForm({ name, phone, email, password, confirm });
     setErrors(nextErrors);
     setFailure(null);
     if (Object.keys(nextErrors).length > 0) return;

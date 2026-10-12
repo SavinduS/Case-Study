@@ -11,6 +11,7 @@ import {
 import { ApiError, getReport, pingServer } from '../api/client';
 import { INCIDENT_ICONS, INCIDENT_LABELS } from '../constants/incidentTypes';
 import { listReports } from '../services/offlineQueue';
+import { relativeTime } from '../utils/time';
 import StatusBanner from '../components/StatusBanner';
 import ScreenHeader from '../components/ScreenHeader';
 import SignOutButton from '../components/SignOutButton';
@@ -33,16 +34,6 @@ type LiveState =
   | { state: 'ok'; status: string }
   | { state: 'missing' }
   | { state: 'error' };
-
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(iso).toLocaleDateString();
-}
 
 export default function MyReportsScreen({ onRefreshReports, onSignOut }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);

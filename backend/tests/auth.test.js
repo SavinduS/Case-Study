@@ -291,4 +291,33 @@ describe('POST /api/auth/register/villager (public mobile sign-up)', () => {
       .send({ name: 'No Phone' });
     expect(missing.status).toBe(400);
   });
+
+  test('lowercases the email the same way the admin register does', async () => {
+    const { res } = await signUp({ email: '  Soma.Silva@Example.COM ' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.email).toBe('soma.silva@example.com');
+    const stored = await User.findById(res.body.id).lean();
+    expect(stored.email).toBe('soma.silva@example.com');
+  });
+
+  test('rejects a malformed email but still allows sign-up without one', async () => {
+    const bad = await signUp({ email: 'not-an-address' });
+    expect(bad.res.status).toBe(400);
+
+    const none = await signUp();
+    expect(none.res.status).toBe(201);
+    expect(none.res.body.email).toBeUndefined();
+  });
+
+  test('sign-in right after sign-up returns phone and email in the session', async () => {
+    const { res, phone } = await signUp({ email: 'soma@example.com' });
+    expect(res.status).toBe(201);
+
+    const loginRes = await login(phone, 'secret123');
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.phone).toBe(phone);
+    expect(loginRes.body.email).toBe('soma@example.com');
+    expect(loginRes.body.token).toEqual(expect.any(String));
+  });
 });

@@ -8,7 +8,8 @@
     "test": "npm run test:jest && npm run test:vitest",
     "test:jest": "jest --runInBand",
     "test:vitest": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:jest": "jest --runInBand --coverage"
   },
   "jest": {
     "testEnvironment": "node",
