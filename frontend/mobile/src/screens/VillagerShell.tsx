@@ -11,13 +11,14 @@ import LocationPickerScreen from './LocationPickerScreen';
 import MyReportsScreen from './MyReportsScreen';
 import ReportPendingScreen from './ReportPendingScreen';
 import ReportSuccessScreen from './ReportSuccessScreen';
+import SmsGuideScreen from './SmsGuideScreen';
 import SubmitReportScreen, { type SubmitData } from './SubmitReportScreen';
 
 interface Props {
   onSignOut: () => void;
 }
 
-type VillagerView = 'submit' | 'myReports' | 'pending' | 'success' | 'picker';
+type VillagerView = 'submit' | 'myReports' | 'smsGuide' | 'pending' | 'success' | 'picker';
 
 /**
  * Villager home after sign-in: the conflict-report flow.
@@ -125,7 +126,9 @@ export default function VillagerShell({ onSignOut }: Props) {
 
   const screen =
     view === 'myReports' ? (
-      <MyReportsScreen onRefreshReports={refreshReports} />
+      <MyReportsScreen onRefreshReports={refreshReports} onSignOut={onSignOut} />
+    ) : view === 'smsGuide' ? (
+      <SmsGuideScreen onSignOut={onSignOut} />
     ) : (
       <SubmitReportScreen
         gps={gps}
@@ -136,6 +139,7 @@ export default function VillagerShell({ onSignOut }: Props) {
         photoError={photoError}
         onSubmit={(data) => void handleSubmit(data)}
         onOpenPicker={() => setView('picker')}
+        onSignOut={onSignOut}
         onPhotoChange={(uri) => {
           setPhotoUri(uri);
           // Clearing or re-picking a photo clears the "rejected photo" note.
@@ -149,9 +153,10 @@ export default function VillagerShell({ onSignOut }: Props) {
       {screen}
       <TabBar
         tabs={VILLAGER_TABS}
-        active={view === 'myReports' ? 'myReports' : 'submit'}
-        onSelect={(id) => setView(id === 'myReports' ? 'myReports' : 'submit')}
-        onSignOut={onSignOut}
+        active={view === 'myReports' || view === 'smsGuide' ? view : 'submit'}
+        onSelect={(id) =>
+          setView(id === 'myReports' ? 'myReports' : id === 'smsGuide' ? 'smsGuide' : 'submit')
+        }
       />
     </View>
   );
