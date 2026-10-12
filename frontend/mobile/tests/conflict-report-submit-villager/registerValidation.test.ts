@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateRegisterForm } from '../registerValidation';
+import { validateRegisterForm } from '../../src/auth/registerValidation';
 
 const VALID = {
   name: 'Soma Silva',
