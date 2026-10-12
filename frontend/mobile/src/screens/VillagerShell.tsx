@@ -6,10 +6,12 @@ import TabBar, { VILLAGER_TABS } from '../components/TabBar';
 import { enqueue, flushQueue, recordOnlineSuccess } from '../services/offlineQueue';
 import { useFieldIncidentLocation } from '../hooks/useFieldIncidentLocation';
 import { colors } from '../theme';
+import type { AuthSession } from '../auth/types';
 import type { GpsFix } from '../services/location';
 import type { ConflictReportConfirmation, ReportSubmission } from '../types';
 import LocationPickerScreen from './LocationPickerScreen';
 import MyReportsScreen from './MyReportsScreen';
+import ProfileScreen from './ProfileScreen';
 import ReportPendingScreen from './ReportPendingScreen';
 import ReportSuccessScreen from './ReportSuccessScreen';
 import SmsGuideScreen from './SmsGuideScreen';
@@ -17,9 +19,17 @@ import SubmitReportScreen, { type SubmitData } from './SubmitReportScreen';
 
 interface Props {
   onSignOut: () => void;
+  user: AuthSession;
 }
 
-type VillagerView = 'submit' | 'myReports' | 'smsGuide' | 'pending' | 'success' | 'picker';
+type VillagerView =
+  | 'submit'
+  | 'myReports'
+  | 'smsGuide'
+  | 'profile'
+  | 'pending'
+  | 'success'
+  | 'picker';
 
 /**
  * Villager home after sign-in: the conflict-report flow.
@@ -28,7 +38,7 @@ type VillagerView = 'submit' | 'myReports' | 'smsGuide' | 'pending' | 'success' 
  *        -> (no connection)     pending -> my reports
  * my reports lists everything this device knows about and retries uploads.
  */
-export default function VillagerShell({ onSignOut }: Props) {
+export default function VillagerShell({ onSignOut, user }: Props) {
   const [view, setView] = useState<VillagerView>('submit');
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -131,6 +141,8 @@ export default function VillagerShell({ onSignOut }: Props) {
       <MyReportsScreen onRefreshReports={refreshReports} onSignOut={onSignOut} />
     ) : view === 'smsGuide' ? (
       <SmsGuideScreen onSignOut={onSignOut} />
+    ) : view === 'profile' ? (
+      <ProfileScreen user={user} onSignOut={onSignOut} />
     ) : (
       <SubmitReportScreen
         gps={gps}
@@ -155,10 +167,13 @@ export default function VillagerShell({ onSignOut }: Props) {
       {screen}
       <TabBar
         tabs={VILLAGER_TABS}
-        active={view === 'myReports' || view === 'smsGuide' ? view : 'submit'}
-        onSelect={(id) =>
-          setView(id === 'myReports' ? 'myReports' : id === 'smsGuide' ? 'smsGuide' : 'submit')
+        active={
+          view === 'myReports' || view === 'smsGuide' || view === 'profile' ? view : 'submit'
         }
+        onSelect={(id) => {
+          if (id === 'myReports' || id === 'smsGuide' || id === 'profile') setView(id);
+          else setView('submit');
+        }}
       />
     </View>
   );

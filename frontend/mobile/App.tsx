@@ -110,7 +110,14 @@ function AppContent() {
       try {
         const user = await fetchMe(stored.token);
         if (cancelled) return;
-        const refreshed: AuthSession = { ...stored, id: user.id, name: user.name, role: user.role };
+        const refreshed: AuthSession = {
+          ...stored,
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+          email: user.email
+        };
         await saveSession(refreshed);
         setSession(refreshed);
         setBoot('signedIn');
@@ -176,7 +183,7 @@ function AppContent() {
   if (session.role === 'villager') {
     return (
       <SafeFrame>
-        <VillagerShell onSignOut={() => void handleSignOut()} />
+        <VillagerShell user={session} onSignOut={() => void handleSignOut()} />
       </SafeFrame>
     );
   }

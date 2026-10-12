@@ -13,10 +13,18 @@ function signToken(user) {
   return jwt.sign({ sub: user._id.toString(), role: user.role }, config.jwtSecret, { expiresIn: '7d' });
 }
 
-// The mobile client renders the signed-in user's name and role straight after
-// login, so both travel with the token instead of costing a second request.
+// The mobile client renders the signed-in user's name, role and contact
+// details straight after login, so they travel with the token instead of
+// costing a second request.
 function sessionPayload(user, token) {
-  return { id: user._id, name: user.name, role: user.role, token };
+  return {
+    id: user._id,
+    name: user.name,
+    role: user.role,
+    phone: user.phone,
+    email: user.email,
+    token
+  };
 }
 
 // Emails are matched case-insensitively (the schema lowercases on write).
@@ -86,7 +94,13 @@ async function me(req, res, next) {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(401).json({ message: 'Account no longer exists' });
-    res.json({ id: user._id, name: user.name, role: user.role });
+    res.json({
+      id: user._id,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      email: user.email
+    });
   } catch (e) { next(e); }
 }
 

@@ -211,7 +211,7 @@ describe('GET /api/auth/me (session restore on app start)', () => {
       .set('Authorization', `Bearer ${created.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: created.id, name: 'Kamal', role: 'officer' });
+    expect(res.body).toEqual({ id: created.id, name: 'Kamal', role: 'officer', phone: created.phone });
   });
 
   test('rejects a missing or unusable token', async () => {

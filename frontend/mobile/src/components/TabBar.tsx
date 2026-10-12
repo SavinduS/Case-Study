@@ -15,11 +15,13 @@ export const RANGER_TABS: TabBarTab[] = [
   { id: 'myIncidents', icon: '📋', label: 'My Incidents' }
 ];
 
-/** Villager: raise a conflict report, then track the reports sent from this phone. */
+/** Villager: raise a conflict report, track the reports sent from this phone,
+ * follow the SMS guide, and view the signed-in account. */
 export const VILLAGER_TABS: TabBarTab[] = [
   { id: 'submit', icon: '🐘', label: 'Report Conflict' },
   { id: 'myReports', icon: '📄', label: 'My Reports' },
-  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' }
+  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' },
+  { id: 'profile', icon: '👤', label: 'My Profile' }
 ];
 
 interface Props {

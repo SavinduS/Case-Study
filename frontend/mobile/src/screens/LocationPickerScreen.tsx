@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import PrimaryButton from '../components/PrimaryButton';
@@ -84,11 +84,32 @@ export default function LocationPickerScreen({
   const [gpsError, setGpsError] = useState<string | null>(null);
 
   const webRef = useRef<WebView>(null);
+  const webLoadedRef = useRef(false);
+  const pendingPinRef = useRef<{ lat: number; lng: number } | null>(null);
   const initialLat = initialFix ? initialFix.coordinates[1] : DEFAULT_LAT;
   const initialLng = initialFix ? initialFix.coordinates[0] : DEFAULT_LNG;
   // Memo must not depend on live pin — taps/drag update the map via messages only,
   // so the WebView never reloads.
   const mapHtml = useMemo(() => buildMapHtml(initialLat, initialLng), [initialLat, initialLng]);
+
+  // Move the map marker from native code; if the WebView has not finished
+  // loading yet, queue the pin and flush it in onLoadEnd so it is never lost.
+  function sendPinToMap(lat: number, lng: number) {
+    const pinMsg = JSON.stringify({ type: 'setPin', lat, lng });
+    if (webLoadedRef.current) {
+      webRef.current?.postMessage(pinMsg);
+    } else {
+      pendingPinRef.current = { lat, lng };
+    }
+  }
+
+  // The picker opens on the user's real position (unless a manual pin was
+  // already handed in, which is never overridden).
+  useEffect(() => {
+    if (!initialManual) void detectCurrent();
+    // Run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleMapMessage(event: { nativeEvent: { data: string } }) {
     try {
@@ -115,9 +136,7 @@ export default function LocationPickerScreen({
       const fix = await getCurrentFix();
       setPin({ lng: fix.coordinates[0], lat: fix.coordinates[1] });
       setManual(false);
-      webRef.current?.postMessage(
-        JSON.stringify({ type: 'setPin', lat: fix.coordinates[1], lng: fix.coordinates[0] })
-      );
+      sendPinToMap(fix.coordinates[1], fix.coordinates[0]);
     } catch {
       setGpsError('GPS could not determine your position.');
     } finally {
@@ -150,6 +169,16 @@ export default function LocationPickerScreen({
           originWhitelist={['*']}
           source={{ html: mapHtml }}
           onMessage={handleMapMessage}
+          onLoadEnd={() => {
+            webLoadedRef.current = true;
+            const queued = pendingPinRef.current;
+            if (queued) {
+              pendingPinRef.current = null;
+              webRef.current?.postMessage(
+                JSON.stringify({ type: 'setPin', lat: queued.lat, lng: queued.lng })
+              );
+            }
+          }}
           androidLayerType="hardware"
           textZoom={100}
           style={styles.map}

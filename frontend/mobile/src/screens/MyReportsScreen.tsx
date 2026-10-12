@@ -158,18 +158,6 @@ export default function MyReportsScreen({ onRefreshReports, onSignOut }: Props) 
     );
   }
 
-  const refreshButton = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Refresh reports"
-      onPress={handleRefresh}
-      disabled={refreshing}
-      style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-    >
-      <Text style={styles.headerLink}>{refreshing ? '…' : 'Refresh'}</Text>
-    </Pressable>
-  );
-
   const pendingCount = entries.filter(
     (e) => e.status === 'PENDING_UPLOAD'
   ).length;
@@ -178,12 +166,7 @@ export default function MyReportsScreen({ onRefreshReports, onSignOut }: Props) 
     <View style={styles.container}>
       <ScreenHeader
         title="My Reports"
-        right={
-          <View style={styles.headerActions}>
-            {refreshButton}
-            {onSignOut ? <SignOutButton onPress={onSignOut} /> : null}
-          </View>
-        }
+        right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
       />
 
       {pendingCount > 0 ? (
@@ -238,24 +221,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg
   },
-  headerButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  headerLink: {
-    color: colors.primary,
-    fontSize: font.body,
-    fontWeight: '600'
-  },
-  bannerWrap: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md
-  },
   summaryWrap: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md
@@ -264,6 +229,10 @@ const styles = StyleSheet.create({
     color: colors.offlineText,
     fontSize: font.small,
     fontWeight: '600'
+  },
+  bannerWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md
   },
   listContent: {
     padding: spacing.md,
