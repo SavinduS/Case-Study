@@ -53,3 +53,16 @@ export function roleDescription(role: UserRole): string {
 export function roleLabel(role: UserRole): string {
   return ROLE_LABELS[role];
 }
+
+// Where each web-UI role starts inside the dashboard. The Operations Officer
+// works the collar alert dashboard; the Park Manager works the analytics
+// workspace, which the portal serves under /analytics.
+const DASHBOARD_HOME: Record<string, string> = {
+  manager: '/analytics/type',
+  officer: '/'
+};
+
+/** Path of the dashboard a web-UI role should open first. */
+export function dashboardPathForRole(role: UserRole): string {
+  return DASHBOARD_HOME[role] ?? '/';
+}

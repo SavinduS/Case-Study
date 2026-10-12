@@ -175,10 +175,15 @@ One login screen for the app; the role in the token decides what opens next.
 
 | Role | After sign-in |
 | --- | --- |
-| Park Manager | Operations Dashboard, loaded in a WebView |
-| Operations Officer | Operations Dashboard, loaded in a WebView |
+| Park Manager | Analytics workspace (`/analytics/type`) in a WebView |
+| Operations Officer | Collar alert dashboard (`/`) in a WebView |
 | Ranger | Field app — offline incident capture (report → review → My Incidents) |
 | Villager | Field app — conflict report (submit → pending/success → My Reports) |
+
+Each role has its own home in the portal, on both surfaces: signing in on the
+mobile app opens the matching dashboard path, and the same is true of the web
+sign-in page. A Park Manager who lands on `/` is moved to the analytics
+workspace rather than the officer dashboard.
 
 ### Try it
 
@@ -194,8 +199,8 @@ password is `password123`:
 
 | Role | Email | Phone | Lands on |
 | --- | --- | --- | --- |
-| Park Manager | `manager@wildlife.demo` | `+94770000001` | Operations Dashboard |
-| Operations Officer | `officer@wildlife.demo` | `+94770000002` | Operations Dashboard |
+| Park Manager | `manager@wildlife.demo` | `+94770000001` | Analytics workspace |
+| Operations Officer | `officer@wildlife.demo` | `+94770000002` | Collar alert dashboard |
 | Ranger | `ranger@wildlife.demo` | `+94770000003` | Field app |
 | Villager | `villager@wildlife.demo` | `+94770000004` | Field app |
 

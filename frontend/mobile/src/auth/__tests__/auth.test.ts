@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   USER_ROLES,
   WEB_UI_ROLES,
+  dashboardPathForRole,
   destinationForRole,
   goesToWebDashboard,
   isUserRole,
@@ -29,6 +30,22 @@ describe('sign-in routing by role', () => {
       expect(['webDashboard', 'fieldApp']).toContain(destinationForRole(role));
       expect(roleLabel(role).length).toBeGreaterThan(0);
       expect(roleDescription(role)).toMatch(/Opens /);
+    }
+  });
+});
+
+describe('dashboard home path by role', () => {
+  it('sends the Park Manager to the analytics workspace', () => {
+    expect(dashboardPathForRole('manager')).toBe('/analytics/type');
+  });
+
+  it('sends the Operations Officer to the collar alert dashboard', () => {
+    expect(dashboardPathForRole('officer')).toBe('/');
+  });
+
+  it('has a path for every role, even the ones that never see the web UI', () => {
+    for (const role of USER_ROLES) {
+      expect(dashboardPathForRole(role).startsWith('/')).toBe(true);
     }
   });
 });
