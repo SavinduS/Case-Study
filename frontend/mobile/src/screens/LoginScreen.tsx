@@ -17,6 +17,8 @@ import type { AuthSession } from '../auth/types';
 interface Props {
   /** Resolves the signed-in user, or rejects with an Error carrying the reason. */
   onSubmit: (identifier: string, password: string) => Promise<AuthSession>;
+  /** Opens the villager sign-up screen. */
+  onRegister?: () => void;
 }
 
 // Deliberately permissive, and the same shape the backend accepts: the point
@@ -44,7 +46,7 @@ function validate(identifier: string, password: string): Record<string, string> 
   return errors;
 }
 
-export default function LoginScreen({ onSubmit }: Props) {
+export default function LoginScreen({ onSubmit, onRegister }: Props) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -149,6 +151,20 @@ export default function LoginScreen({ onSubmit }: Props) {
             />
           </View>
         </View>
+
+        {onRegister ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create a villager account"
+            onPress={onRegister}
+            disabled={submitting}
+            style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.footerText}>
+              New villager? <Text style={styles.footerAccent}>Create an account</Text>
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -252,5 +268,19 @@ const styles = StyleSheet.create({
   },
   submitBlock: {
     marginTop: spacing.xs
+  },
+  footerLink: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md
+  },
+  footerText: {
+    color: colors.textMuted,
+    fontSize: font.body
+  },
+  footerAccent: {
+    color: colors.primary,
+    fontWeight: '700'
   }
 });

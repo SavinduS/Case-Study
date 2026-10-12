@@ -105,6 +105,27 @@ export async function fetchMe(
   return request<Omit<AuthSession, 'token'>>('/api/auth/me', {}, token);
 }
 
+// Public sign-up for villagers. The server always creates a villager account
+// regardless of anything sent here; the response is the same session shape as
+// login, so the caller can drop straight into the app.
+export async function registerVillager(input: {
+  name: string;
+  phone: string;
+  password: string;
+  email?: string;
+}): Promise<AuthSession> {
+  const data = await request<Record<string, unknown>>('/api/auth/register/villager', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  });
+  if (!isAuthSession(data)) {
+    throw new ApiError(500, {
+      message: 'Sign-up response was not understood. Please try again.'
+    });
+  }
+  return data;
+}
+
 export function createReport(body: ReportSubmission): Promise<ConflictReportConfirmation> {
   return request<ConflictReportConfirmation>('/api/conflict-reports', {
     method: 'POST',
