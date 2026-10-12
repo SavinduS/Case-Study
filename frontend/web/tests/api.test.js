@@ -33,12 +33,41 @@ describe('request building', () => {
     await api.respondToAlert('CBA-1', 'mark_false_alarm', { notes: 'drift' });
 
     const [, options] = fetch.mock.calls[0];
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers['Content-Type']).toBe('application/json');
+    // The acting officer comes from the session token on the server, so no
+    // body field claims who acted.
     expect(JSON.parse(options.body)).toEqual({
       action: 'mark_false_alarm',
-      notes: 'drift',
-      actor: 'officer'
+      notes: 'drift'
     });
+  });
+
+  it('attaches the session token so the API can authorise the call', async () => {
+    window.localStorage.setItem(
+      '@wildlife-alert/web-session',
+      JSON.stringify({ id: 'u1', name: 'Nimali Perera', role: 'officer', token: 'tok-123' })
+    );
+    fetch.mockResolvedValue(ok([]));
+    await api.getAlerts();
+
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer tok-123');
+  });
+
+  it('sends no Authorization header when there is no session', async () => {
+    fetch.mockResolvedValue(ok([]));
+    await api.getAlerts();
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBeUndefined();
+  });
+
+  it('hands a 401 to the unauthorized handler so the officer is signed out', async () => {
+    const handler = vi.fn();
+    api.setUnauthorizedHandler(handler);
+    fetch.mockResolvedValue(fail(401, 'Invalid or expired token'));
+
+    await expect(api.getAlerts()).rejects.toThrow('Invalid or expired token');
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    api.setUnauthorizedHandler(null);
   });
 
   it('omits a body for reads', async () => {

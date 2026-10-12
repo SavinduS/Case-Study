@@ -11,11 +11,11 @@ import Sidebar from '../src/layout/Sidebar.jsx';
 import MapLegend from '../src/features/collar-alerts/components/map/MapLegend.jsx';
 import { ClockChip, StatusChips, ControlStack, useClock } from '../src/features/collar-alerts/components/map/MapChrome.jsx';
 import SignalLostBanner from '../src/features/collar-alerts/components/alerts/SignalLostBanner.jsx';
-import SessionExpiredOverlay from '../src/features/collar-alerts/components/alerts/SessionExpiredOverlay.jsx';
+import SoundControl from '../src/features/collar-alerts/components/alerts/SoundControl.jsx';
 import DispatchToast from '../src/features/collar-alerts/components/alerts/DispatchToast.jsx';
 import OperationsDrawer from '../src/features/collar-alerts/components/alerts/OperationsDrawer.jsx';
-import PortalModuleRoute from '../src/pages/PortalModuleRoute.jsx';
 import { THREAT_LEVEL, ALERT_STATUS } from '../src/features/collar-alerts/domain/labels.js';
+import { saveSession as storeSession } from '../src/services/session.js';
 
 describe('Button', () => {
   it('defaults to a submit-safe type and fires onClick', async () => {
@@ -108,10 +108,45 @@ describe('ModulePlaceholder', () => {
 });
 
 describe('Topbar', () => {
-  it('marks the active tab and links the others', () => {
+  it('marks the active tab and links the reports workspace', () => {
     render(<MemoryRouter><Topbar /></MemoryRouter>);
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
+    // Reports opens the working analytics workspace, not a placeholder page.
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/analytics/type');
+  });
+
+  it('offers exactly two destinations: the dashboard and reports', () => {
+    render(<MemoryRouter><Topbar /></MemoryRouter>);
+    const links = screen.getByRole('navigation', { name: 'Primary' }).querySelectorAll('a');
+    expect([...links].map((a) => a.textContent)).toEqual(['Dashboard', 'Reports']);
+  });
+
+  // The map the officer needs is already the dashboard's full-bleed background,
+  // and Data Logs was a placeholder for a module nobody owns.
+  it.each(['Data Logs', 'Map View'])('offers no %s entry', (label) => {
+    render(<MemoryRouter><Topbar /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument();
+  });
+
+  it('offers no Admin entry: user and park administration is not this role\'s shift', () => {
+    render(<MemoryRouter><Topbar /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+  });
+
+  it('shows the role once, not the role and the display name', () => {
+    storeSession({ id: 'u1', name: 'Operations Officer (Demo)', role: 'officer', token: 't' });
+    render(<MemoryRouter><Topbar /></MemoryRouter>);
+
+    expect(screen.getAllByText('Operations Officer')).toHaveLength(1);
+    expect(screen.queryByText('Operations Officer (Demo)')).not.toBeInTheDocument();
+  });
+
+  it('gives the avatar real initials even for a parenthesised name', () => {
+    storeSession({ id: 'u1', name: 'Operations Officer (Demo)', role: 'officer', token: 't' });
+    const { container } = render(<MemoryRouter><Topbar /></MemoryRouter>);
+    // "O(" used to be rendered for "Operations Officer (Demo)".
+    expect(container.textContent).toContain('OO');
+    expect(container.textContent).not.toContain('O(');
   });
 
   it('shows the signed-in officer', () => {
@@ -123,9 +158,21 @@ describe('Topbar', () => {
 describe('Sidebar', () => {
   it('exposes every module with an accessible name', () => {
     render(<Sidebar activeKey="alerts" onSelect={vi.fn()} />);
-    for (const label of ['Tracked collars', 'Active alerts', 'Geofences', 'Settings']) {
+    for (const label of ['Tracked collars', 'Active alerts', 'Geofences']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
+  });
+
+  it('carries no Administration entry for the Operations Officer', () => {
+    render(<Sidebar activeKey="alerts" onSelect={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+  });
+
+  // Reports live in their own workspace behind the top bar tab, not as a panel
+  // over the map.
+  it('carries no Analytics reports entry', () => {
+    render(<Sidebar activeKey="alerts" onSelect={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Analytics reports' })).not.toBeInTheDocument();
   });
 
   it('marks the active module', () => {
@@ -246,24 +293,47 @@ describe('SignalLostBanner', () => {
   });
 });
 
-describe('SessionExpiredOverlay', () => {
-  it('stays hidden while the session is live', () => {
-    const { container } = render(<SessionExpiredOverlay open={false} onResume={vi.fn()} />);
-    expect(container).toBeEmptyDOMElement();
+describe('SoundControl', () => {
+  const alarm = (overrides = {}) => ({
+    muted: false,
+    blocked: false,
+    supported: true,
+    onToggleMuted: vi.fn(),
+    onEnableSound: vi.fn(),
+    ...overrides
   });
 
-  it('explains that the alert queue will be restored', () => {
-    render(<SessionExpiredOverlay open onResume={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: 'Session expired' })).toBeInTheDocument();
-    expect(screen.getByText(/restore the dashboard view and active alert queue/i)).toBeInTheDocument();
-  });
-
-  it('resumes on confirmation', async () => {
+  it('offers a mute control that reflects the current state', async () => {
     const user = userEvent.setup();
-    const onResume = vi.fn();
-    render(<SessionExpiredOverlay open onResume={onResume} />);
-    await user.click(screen.getByRole('button', { name: /Sign in and restore alert queue/ }));
-    expect(onResume).toHaveBeenCalled();
+    const onToggleMuted = vi.fn();
+    render(<SoundControl {...alarm({ muted: false, onToggleMuted })} />);
+
+    const button = screen.getByRole('button', { name: /Sound on/i });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    await user.click(button);
+    expect(onToggleMuted).toHaveBeenCalled();
+  });
+
+  it('says the alarm is off when muted', () => {
+    render(<SoundControl {...alarm({ muted: true })} />);
+    expect(screen.getByRole('button', { name: /Sound off/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('offers to enable sound only once the browser has blocked it', async () => {
+    const user = userEvent.setup();
+    const onEnableSound = vi.fn();
+    const { rerender } = render(<SoundControl {...alarm({ blocked: false })} />);
+    expect(screen.queryByRole('button', { name: /Enable alert sound/ })).not.toBeInTheDocument();
+
+    rerender(<SoundControl {...alarm({ blocked: true, onEnableSound })} />);
+    await user.click(screen.getByRole('button', { name: /Enable alert sound/ }));
+    expect(onEnableSound).toHaveBeenCalled();
+  });
+
+  it('degrades to a written notice when the browser cannot play audio', () => {
+    render(<SoundControl {...alarm({ supported: false })} />);
+    expect(screen.getByText(/not available in this browser/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 
@@ -406,19 +476,17 @@ describe('OperationsDrawer', () => {
   });
 });
 
-describe('PortalModuleRoute', () => {
-  it('renders nothing for an unknown module', () => {
-    const { container } = render(<PortalModuleRoute moduleKey="nope" />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it.each([
-    ['data-logs', 'Data Logs'],
-    ['map-view', 'Map View'],
-    ['reports', 'Reports'],
-    ['admin', 'Admin']
-  ])('%s renders its placeholder', (key, title) => {
-    render(<PortalModuleRoute moduleKey={key} />);
-    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+describe('ModulePlaceholder', () => {
+  it('names the owning member instead of pretending to be a working module', () => {
+    render(
+      <ModulePlaceholder
+        title="Field incidents"
+        owner="Mandinu R P S"
+        useCaseName="Log Field Incident Offline"
+        description="Rangers record snares offline."
+      />
+    );
+    expect(screen.getByRole('heading', { name: 'Field incidents' })).toBeInTheDocument();
+    expect(screen.getByText('Mandinu R P S')).toBeInTheDocument();
   });
 });

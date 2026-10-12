@@ -5,12 +5,14 @@ import usePortalSession from './usePortalSession.js';
 import { initialsOf, isEmbedded, roleLabel, signOut } from '../services/session.js';
 import Sidebar, { RAIL } from './Sidebar.jsx';
 
+// Operations Officer navigation. Two working destinations and nothing else:
+// the collar alert dashboard and the reports workspace. Data Logs and Map View
+// were placeholders for shared-platform modules, and the map the officer needs
+// is already the full-bleed background of the dashboard — offering it as its
+// own tab only sent people to an empty page.
 const NAV = [
   { key: 'dashboard', label: 'Dashboard', to: '/', implemented: true },
-  { key: 'dataLogs', label: 'Data Logs', to: '/data-logs', implemented: false },
-  { key: 'map', label: 'Map View', to: '/map-view', implemented: false },
-  { key: 'reports', label: 'Reports', to: '/reports', implemented: false },
-  { key: 'admin', label: 'Admin', to: '/admin', implemented: false }
+  { key: 'reports', label: 'Reports', to: '/analytics/type', implemented: true }
 ];
 
 /**
@@ -112,10 +114,10 @@ export default function Topbar() {
         <span className="grid h-8 w-8 place-items-center rounded-full bg-moss-500 text-xs font-bold lg:h-9 lg:w-9 lg:text-sm">
           {session ? initialsOf(session.name) : 'OO'}
         </span>
+        {/* The role is what this screen is about, and it is the only label
+            here: the display name repeated next to it said the same thing
+            twice ("Operations Officer" / "Operations Officer (Demo)"). */}
         <span className="hidden text-sm font-semibold sm:inline">{roleLabel(session)}</span>
-        <span className="hidden max-w-[10rem] truncate text-sm text-white/60 lg:inline">
-          {session ? session.name : ''}
-        </span>
         {/* The app's guard sends anyone without a session to the sign-in
             page, so here there is always something to sign out of. */}
         {session ? (

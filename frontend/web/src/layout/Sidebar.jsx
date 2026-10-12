@@ -5,6 +5,13 @@
  * design; selecting one shows an explicit placeholder instead of a dead
  * button. `collars`, `alerts` and `geofences` are driven by the collar
  * boundary alert use case and open real panels.
+ *
+ * Administration is deliberately absent. User accounts and park configuration
+ * are an administrator's job, not part of the Operations Officer's shift, so the
+ * rail does not offer a route the officer could not use. Analytics reports are
+ * absent for the same reason in the other direction: they are a full workspace
+ * with their own shell and top bar, not a panel that belongs on the map, so the
+ * top bar's Reports tab is the only place they are offered.
  */
 export const RAIL = [
   {
@@ -35,25 +42,13 @@ export const RAIL = [
     key: 'patrol',
     label: 'Patrols',
     owner: 'Wijesingha S M',
-    icon: 'M4 20l4-1 10-10-3-3L5 16l-1 4Zm13.7-12.3 1.6-1.6a1 1 0 0 0 0-1.4l-2-2a1 1 0 0 0-1.4 0l-1.6 1.6 3.4 3.4Z'
+    icon: 'M4 20l4-1 10-10-3-3L5 16l-1 4Zm13.7-12.3 1.6-1.6a2 2 0 0 0 0-1.4l-2-2a2 2 0 0 0-1.4 0l-1.6 1.6 3.4 3.4Z'
   },
   {
     key: 'cameras',
     label: 'Camera traps',
     owner: 'Not in the group design',
     icon: 'M9 4h6l1.5 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5L9 4Zm3 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z'
-  },
-  {
-    key: 'reports',
-    label: 'Analytics reports',
-    owner: 'Wijesingha S M',
-    icon: 'M6 2h8l4 4v16H6V2Zm7 1.5V7h3.5L13 3.5Z'
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    owner: 'Shared platform module',
-    icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a9 9 0 0 0-.2-1.8l2-1.5-2-3.5-2.4 1a9 9 0 0 0-3.1-1.8L15 2H9l-.4 2.4a9 9 0 0 0-3.1 1.8l-2.4-1-2 3.5 2 1.5a9.3 9.3 0 0 0 0 3.6l-2 1.5 2 3.5 2.4-1a9 9 0 0 0 3.1 1.8L9 22h6l.4-2.4a9 9 0 0 0 3.1-1.8l2.4 1 2-3.5-2-1.5c.13-.6.2-1.2.2-1.8Z'
   }
 ];
 

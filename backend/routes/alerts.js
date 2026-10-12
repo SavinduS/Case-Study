@@ -5,6 +5,11 @@ const {
   respondToAlert,
   getDispatchAttempts
 } = require('../controllers/alertController');
+const { operationsAuth } = require('../middlewares/operationsAccess');
+
+// Every alert route is officer/manager only: the queue, the audit trail and the
+// response actions are operational data, not public telemetry.
+router.use(...operationsAuth);
 
 router.get('/', getAlerts);
 router.get('/:alertId', getAlertById);
