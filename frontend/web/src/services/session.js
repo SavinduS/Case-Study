@@ -24,6 +24,17 @@ export const ROLE_LABELS = {
 // Shown when the dashboard is opened directly with no session (development).
 export const DEFAULT_ROLE_LABEL = 'Operations Officer';
 
+// Where each web role works: the Operations Officer runs the collar alert
+// dashboard, the Park Manager the analytics workspace under /analytics.
+const ROLE_HOME = {
+  manager: '/analytics/type',
+  officer: '/'
+};
+
+export function homePathForRole(role) {
+  return ROLE_HOME[role] ?? '/';
+}
+
 export function roleLabel(session) {
   if (!session) return DEFAULT_ROLE_LABEL;
   return ROLE_LABELS[session.role] ?? DEFAULT_ROLE_LABEL;

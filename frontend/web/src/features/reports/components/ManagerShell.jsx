@@ -1,4 +1,6 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import usePortalSession from '../../../layout/usePortalSession.js';
+import { initialsOf, isEmbedded, roleLabel, signOut } from '../../../services/session.js';
 
 const NAV = [
   { to: '/analytics/type', label: 'Analytics' },
@@ -7,6 +9,16 @@ const NAV = [
 ];
 
 export default function ManagerShell({ children }) {
+  const navigate = useNavigate();
+  const { session } = usePortalSession();
+
+  function handleSignOut() {
+    signOut();
+    // Inside the app the host decides what the phone shows next.
+    if (isEmbedded()) return;
+    navigate('/login', { replace: true });
+  }
+
   return (
     <div className="flex h-screen flex-col bg-sand-100">
       <header className="flex min-h-[4.5rem] shrink-0 items-center bg-park-900 px-4 text-white shadow-lg sm:px-8">
@@ -36,10 +48,26 @@ export default function ManagerShell({ children }) {
         </nav>
         <div className="ml-auto flex items-center gap-3 border-l border-white/15 pl-4">
           <div className="hidden text-right sm:block">
-            <p className="text-xs font-bold">Park Manager</p>
-            <p className="text-[10px] text-white/55">Management workspace</p>
+            <p className="text-xs font-bold">{session ? roleLabel(session) : 'Park Manager'}</p>
+            <p className="text-[10px] text-white/55">
+              {session ? session.name : 'Management workspace'}
+            </p>
           </div>
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-gold-500 text-xs font-black text-park-900">PM</div>
+          <div className="grid h-9 w-9 place-items-center rounded-full bg-gold-500 text-xs font-black text-park-900">
+            {session ? initialsOf(session.name) : 'PM'}
+          </div>
+          {/* Same escape hatch as the officer top bar: this shell does not
+              render the Topbar, so it needs its own. */}
+          {session ? (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="rounded-md border border-white/30 bg-white/10 px-3 py-1.5 text-sm
+                font-semibold text-white transition-colors hover:bg-white/20"
+            >
+              Sign out
+            </button>
+          ) : null}
         </div>
       </header>
       <main className="min-h-0 flex-1">{children}</main>

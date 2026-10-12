@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 import { colors, font, radius, spacing } from '../theme';
 
 interface Props {
@@ -7,9 +7,11 @@ interface Props {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
+  /** Overrides for screens that want a different shape (e.g. a pill). */
+  style?: StyleProp<ViewStyle>;
 }
 
-export default function PrimaryButton({ label, onPress, disabled, loading }: Props) {
+export default function PrimaryButton({ label, onPress, disabled, loading, style }: Props) {
   const inactive = disabled || loading;
   return (
     <Pressable
@@ -20,6 +22,7 @@ export default function PrimaryButton({ label, onPress, disabled, loading }: Pro
       disabled={inactive}
       style={({ pressed }) => [
         styles.button,
+        style,
         inactive && styles.disabled,
         pressed && !inactive && styles.pressed
       ]}

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Topbar from '../src/layout/Topbar.jsx';
 import App from '../src/App.jsx';
 import LoginPage from '../src/pages/LoginPage.jsx';
+import ManagerShell from '../src/features/reports/components/ManagerShell.jsx';
 import {
   SESSION_KEY,
   readSession,
@@ -12,6 +13,7 @@ import {
   signOut,
   requestSessionFromHost,
   isEmbedded,
+  homePathForRole,
   initialsOf,
   roleLabel
 } from '../src/services/session.js';
@@ -37,7 +39,18 @@ function jsonResponse(body, status = 200) {
 
 // The dashboard page polls the API; the guard tests are not about that.
 vi.mock('../src/features/collar-alerts/pages/DashboardPage.jsx', () => ({
-  default: () => <div>Dashboard</div>
+  default: () => <div>Officer dashboard</div>
+}));
+
+// So is the analytics workspace behind the manager shell.
+vi.mock('../src/features/reports/pages/ReportsPage.jsx', () => ({
+  default: () => <div>Analytics reports</div>
+}));
+vi.mock('../src/features/reports/pages/ComparisonPage.jsx', () => ({
+  default: () => <div>Comparison</div>
+}));
+vi.mock('../src/features/reports/pages/SavedReportsPage.jsx', () => ({
+  default: () => <div>Saved reports</div>
 }));
 
 describe('dashboard session', () => {
@@ -103,6 +116,12 @@ describe('dashboard session', () => {
     expect(roleLabel(null)).toBe('Operations Officer');
     expect(initialsOf('Nimali Perera')).toBe('NP');
     expect(initialsOf('Ranger')).toBe('RA');
+  });
+
+  it('gives each web role its own home in the portal', () => {
+    expect(homePathForRole('manager')).toBe('/analytics/type');
+    expect(homePathForRole('officer')).toBe('/');
+    expect(homePathForRole('villager')).toBe('/');
   });
 });
 
@@ -196,6 +215,26 @@ describe('portal sign-in', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Enter your email address');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('shows the password on request and hides it again', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn());
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    const field = screen.getByLabelText('Password');
+    expect(field).toHaveAttribute('type', 'password');
+
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(field).toHaveAttribute('type', 'text');
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(field).toHaveAttribute('type', 'password');
+  });
 });
 
 describe('portal route guard', () => {
@@ -219,6 +258,25 @@ describe('portal route guard', () => {
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
   });
 
+  it('signs a manager into the analytics workspace', async () => {
+    const user = userEvent.setup();
+    const manager = { ...OFFICER, role: 'manager', name: 'Bandula Perera' };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(manager)));
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await user.type(screen.getByLabelText('Email or phone number'), 'manager@wildlife.demo');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByText('Analytics reports')).toBeInTheDocument();
+    expect(readSession()).toEqual(manager);
+  });
+
   it('lets a signed-in officer into the dashboard', () => {
     storeSession(OFFICER);
 
@@ -228,8 +286,35 @@ describe('portal route guard', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Dashboard', { selector: 'div' })).toBeInTheDocument();
+    expect(screen.getByText('Officer dashboard')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  it('opens the analytics workspace for the Park Manager, not the officer dashboard', () => {
+    storeSession({ ...OFFICER, role: 'manager', name: 'Bandula Perera' });
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    // "/" is not the manager's home: the catch-all sends them to analytics.
+    expect(screen.getByText('Analytics reports')).toBeInTheDocument();
+    expect(screen.queryByText('Officer dashboard')).not.toBeInTheDocument();
+    expect(screen.getByText('Bandula Perera')).toBeInTheDocument();
+  });
+
+  it('sends a manager to their own home from an unknown URL', () => {
+    storeSession({ ...OFFICER, role: 'manager' });
+
+    render(
+      <MemoryRouter initialEntries={['/does-not-exist']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Analytics reports')).toBeInTheDocument();
   });
 
   it('turns away a villager session even if one is stored', () => {
@@ -296,6 +381,22 @@ describe('Topbar sign out', () => {
     storeSession(OFFICER);
 
     render(<MemoryRouter><Topbar /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(readSession()).toBeNull();
+  });
+
+  it('gives the manager workspace its own sign out', async () => {
+    const user = userEvent.setup();
+    storeSession({ ...OFFICER, role: 'manager', name: 'Bandula Perera' });
+
+    render(
+      <MemoryRouter>
+        <ManagerShell><div>Analytics reports</div></ManagerShell>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Bandula Perera')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(readSession()).toBeNull();
