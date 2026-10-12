@@ -8,8 +8,8 @@ vi.mock('expo-constants', () => ({
 }));
 vi.mock('expo-file-system', () => ({ File: class {} }));
 
-import { ApiError, registerVillager } from '../../src/api/client';
-import { invalidateBaseUrl } from '../../src/api/baseUrl';
+import { ApiError, registerVillager } from '../api/client';
+import { invalidateBaseUrl } from '../api/baseUrl';
 
 interface FetchCall {
   url: string;

@@ -3,8 +3,8 @@ import {
   INCIDENT_ICONS,
   INCIDENT_LABELS,
   INCIDENT_TYPE_ORDER
-} from '../../src/constants/incidentTypes';
-import { SMS_AREA_CODES, SMS_HOTLINE, SMS_TYPE_CODES } from '../../src/constants/sms';
+} from '../constants/incidentTypes';
+import { SMS_AREA_CODES, SMS_HOTLINE, SMS_TYPE_CODES } from '../constants/sms';
 
 describe('SMS guide constants (shown on the SMS Guide tab)', () => {
   it('has the demo hotline as a dialable string', () => {
