@@ -1,13 +1,21 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import ScreenHeader from "../components/ScreenHeader";
+import SignOutButton from "../components/SignOutButton";
 import { SMS_AREA_CODES, SMS_HOTLINE, SMS_TYPE_CODES } from "../constants/sms";
 import { colors, font, radius, spacing } from "../theme";
 
-export default function SmsGuideScreen() {
+interface Props {
+  onSignOut?: () => void;
+}
+
+export default function SmsGuideScreen({ onSignOut }: Props) {
   return (
     <View style={styles.container}>
-      <ScreenHeader title="SMS Reporting Guide" />
+      <ScreenHeader
+        title="SMS Reporting Guide"
+        right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.intro}>

@@ -13,11 +13,13 @@ import { INCIDENT_LABELS } from '../constants/incidentTypes';
 import { listReports } from '../services/offlineQueue';
 import StatusBanner from '../components/StatusBanner';
 import ScreenHeader from '../components/ScreenHeader';
+import SignOutButton from '../components/SignOutButton';
 import { colors, font, radius, spacing } from '../theme';
 import type { QueuedReport } from '../types';
 
 interface Props {
   onRefreshReports: () => Promise<void>;
+  onSignOut?: () => void;
 }
 
 type ServerState = 'checking' | 'up' | 'down';
@@ -36,7 +38,7 @@ function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-export default function MyReportsScreen({ onRefreshReports }: Props) {
+export default function MyReportsScreen({ onRefreshReports, onSignOut }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -162,7 +164,15 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="My Reports" right={refreshButton} />
+      <ScreenHeader
+        title="My Reports"
+        right={
+          <View style={styles.headerActions}>
+            {refreshButton}
+            {onSignOut ? <SignOutButton onPress={onSignOut} /> : null}
+          </View>
+        }
+      />
 
       <View style={styles.bannerWrap}>
         {server.state === 'checking' ? (
@@ -207,6 +217,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   headerLink: {
     color: colors.primary,

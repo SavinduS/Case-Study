@@ -18,7 +18,8 @@ export const RANGER_TABS: TabBarTab[] = [
 /** Villager: raise a conflict report, then track the reports sent from this phone. */
 export const VILLAGER_TABS: TabBarTab[] = [
   { id: 'submit', icon: '🐘', label: 'Report Conflict' },
-  { id: 'myReports', icon: '📄', label: 'My Reports' }
+  { id: 'myReports', icon: '📄', label: 'My Reports' },
+  { id: 'smsGuide', icon: '💬', label: 'SMS Guide' }
 ];
 
 interface Props {

@@ -13,6 +13,7 @@ import LocationCard from '../components/LocationCard';
 import PhotoPicker from '../components/PhotoPicker';
 import PrimaryButton from '../components/PrimaryButton';
 import ScreenHeader from '../components/ScreenHeader';
+import SignOutButton from '../components/SignOutButton';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsState } from '../services/location';
 import { sectorLabel } from '../services/sectors';
@@ -37,6 +38,7 @@ interface Props {
   onSubmit: (data: SubmitData) => void;
   onOpenPicker: () => void;
   onPhotoChange: (uri: string | null) => void;
+  onSignOut?: () => void;
 }
 
 const MAX_DESCRIPTION = 500;
@@ -50,7 +52,8 @@ export default function SubmitReportScreen({
   photoError,
   onSubmit,
   onOpenPicker,
-  onPhotoChange
+  onPhotoChange,
+  onSignOut
 }: Props) {
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
   const [description, setDescription] = useState('');
@@ -87,7 +90,10 @@ export default function SubmitReportScreen({
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader title="Submit Conflict Report" />
+      <ScreenHeader
+        title="Submit Conflict Report"
+        right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
