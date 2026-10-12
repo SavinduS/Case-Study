@@ -179,9 +179,23 @@ const COLLARS = [
 ];
 
 const RANGER_TEAMS = [
-  { rangerId: 'RT-01', name: 'Ranger Team Kandy', status: RANGER_STATUS.AVAILABLE, position: [81.021, 8.191] },
-  { rangerId: 'RT-02', name: 'Ranger Team Matale', status: RANGER_STATUS.AVAILABLE, position: [81.083, 8.243] },
-  { rangerId: 'RT-03', name: 'Ranger Team Kurunegala', status: RANGER_STATUS.ON_PATROL, position: [80.985, 8.212] }
+  // Every team states gatewayReachable explicitly. The seed upserts with $set,
+  // which never clears a field that has been dropped from this list, so leaving
+  // it off RT-01/RT-02 would let a manual change survive every re-seed and
+  // leave the demo permanently stuck on "Failed Delivery".
+  { rangerId: 'RT-01', name: 'Ranger Team Kandy', status: RANGER_STATUS.AVAILABLE, position: [81.021, 8.191], gatewayReachable: true },
+  { rangerId: 'RT-02', name: 'Ranger Team Matale', status: RANGER_STATUS.AVAILABLE, position: [81.083, 8.243], gatewayReachable: true },
+  // No handset coverage at this camp, so the bundled mock notification adapter
+  // reports it unreachable. It exists so the retry limit and the "Failed
+  // Delivery - contact by radio" path can be demonstrated for real. With a
+  // configured RANGER_GATEWAY_URL the flag is ignored.
+  {
+    rangerId: 'RT-03',
+    name: 'Ranger Team Kurunegala',
+    status: RANGER_STATUS.ON_PATROL,
+    position: [80.985, 8.212],
+    gatewayReachable: false
+  }
 ];
 
 module.exports = { PARK, GEOFENCES, COLLARS, RANGER_TEAMS };

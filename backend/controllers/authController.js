@@ -10,7 +10,13 @@ const ROLES = ['villager', 'ranger', 'officer', 'manager'];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function signToken(user) {
-  return jwt.sign({ sub: user._id.toString(), role: user.role }, config.jwtSecret, { expiresIn: '7d' });
+  // `name` travels with the token so the wildlife monitoring audit trail can
+  // record which officer acted without a second lookup on every write.
+  return jwt.sign(
+    { sub: user._id.toString(), role: user.role, name: user.name },
+    config.jwtSecret,
+    { expiresIn: '7d' }
+  );
 }
 
 // The mobile client renders the signed-in user's name, role and contact

@@ -40,13 +40,27 @@ export function roleLabel(session) {
   return ROLE_LABELS[session.role] ?? DEFAULT_ROLE_LABEL;
 }
 
-// Two-letter avatar initials, e.g. "Nimali Perera" -> "NP".
+/**
+ * Two-letter avatar initials, e.g. "Nimali Perera" -> "NP".
+ *
+ * A trailing parenthetical qualifier is dropped first: the demo account is
+ * called "Operations Officer (Demo)", and reading the last word literally
+ * produced "OD" — and before that "O(", the opening bracket of "(Demo)".
+ * Single-letter middle initials are skipped so "Bandula R. Perera" reads "BP".
+ */
 export function initialsOf(name) {
   if (typeof name !== 'string') return '';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  const words = name
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^A-Za-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return '';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+
+  const meaningful = words.filter((word) => word.length > 1);
+  if (meaningful.length < 2) return words[0].slice(0, 2).toUpperCase();
+  return (meaningful[0][0] + meaningful[meaningful.length - 1][0]).toUpperCase();
 }
 
 /**

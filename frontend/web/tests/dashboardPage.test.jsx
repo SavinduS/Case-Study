@@ -82,8 +82,13 @@ function hookResult(overrides = {}) {
     activeAlert: ALERT,
     auditTrail: [],
     delayedAlerts: [],
+    dispatchAttempts: [],
     lostCollars: [],
-    sessionExpired: false,
+    bannerAlert: ALERT,
+    announced: [],
+    offline: false,
+    lastUpdatedAt: null,
+    responding: {},
     toast: null,
     visibleZoneIds: ['Z1'],
     acknowledgeAndDispatch: vi.fn(),
@@ -97,7 +102,10 @@ function hookResult(overrides = {}) {
     simulateSignalLost: vi.fn(),
     dismissToast: vi.fn(),
     dismissSignalLost: vi.fn(),
-    setSessionExpired: vi.fn(),
+    silenceAlert: vi.fn(),
+    unsilenceAlert: vi.fn(),
+    loadDispatchAttempts: vi.fn().mockResolvedValue([]),
+    pushFix: vi.fn(),
     ...overrides
   };
 }
@@ -140,15 +148,31 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('heading', { name: /Boundary Breach Detected/ })).not.toBeInTheDocument();
   });
 
-  it('surfaces an API failure with a retry instead of a blank map', async () => {
+  it('surfaces an unreachable API with a retry instead of a blank map', async () => {
     const user = userEvent.setup();
     const refresh = vi.fn();
-    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ error: 'Cannot reach the API. Is the backend running?', refresh }));
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({
+      error: 'Cannot reach the API. Is the backend running?',
+      offline: true,
+      refresh
+    }));
     renderPage();
 
     expect(screen.getByText('Cannot reach the API')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it('says a server error is not the same as being offline, and dates the data', async () => {
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({
+      error: 'Request failed (500)',
+      offline: false,
+      lastUpdatedAt: '2026-10-09T14:38:00Z'
+    }));
+    renderPage();
+
+    expect(screen.getByText('The API returned an error')).toBeInTheDocument();
+    expect(screen.getByText(/last successful refresh/i)).toBeInTheDocument();
   });
 
   it('opens the collar registry from the module rail', async () => {
@@ -237,10 +261,35 @@ describe('DashboardPage', () => {
     expect(simulateSignalLost).toHaveBeenCalled();
   });
 
-  it('shows the session expired overlay when the hook says so', () => {
-    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ sessionExpired: true }));
+  it('keeps a critical alert banner on screen alongside the modal', async () => {
+    const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Session expired' })).toBeInTheDocument();
+
+    // The modal can be closed and the alarm muted, but the breach is still
+    // open, so the red strip stays with the reference the officer must act on.
+    expect(screen.getByTestId('critical-alert-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Critical boundary breach — asset E-402/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
+  });
+
+  it('silences the banner through the hook without touching the alert', async () => {
+    const user = userEvent.setup();
+    const silenceAlert = vi.fn();
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ silenceAlert }));
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Silence this alert notification' }));
+    expect(silenceAlert).toHaveBeenCalledWith('CBA-2026-0001');
+    // The incident itself is untouched: the queue still shows it.
+    expect(screen.getByRole('region', { name: 'Active alerts queue' })).toBeInTheDocument();
+  });
+
+  it('hides the banner once every open alert has been silenced', () => {
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ bannerAlert: null, activeAlert: null }));
+    renderPage();
+    expect(screen.queryByTestId('critical-alert-banner')).not.toBeInTheDocument();
   });
 
   it('toggles the operations records drawer from the demo strip', async () => {

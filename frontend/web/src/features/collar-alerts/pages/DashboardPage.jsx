@@ -2,15 +2,17 @@ import { useCallback, useRef, useState } from 'react';
 import Sidebar, { RAIL } from '../../../layout/Sidebar.jsx';
 import DashboardMap from '../components/map/DashboardMap.jsx';
 import CriticalAlertModal from '../components/alerts/CriticalAlertModal.jsx';
+import CriticalAlertBanner from '../components/alerts/CriticalAlertBanner.jsx';
 import ActiveAlertsPanel from '../components/alerts/ActiveAlertsPanel.jsx';
 import SignalLostBanner from '../components/alerts/SignalLostBanner.jsx';
-import SessionExpiredOverlay from '../components/alerts/SessionExpiredOverlay.jsx';
 import DispatchToast from '../components/alerts/DispatchToast.jsx';
 import OperationsDrawer from '../components/alerts/OperationsDrawer.jsx';
 import CollarRegistryPanel from '../components/panels/CollarRegistryPanel.jsx';
 import GeofencePanel from '../components/panels/GeofencePanel.jsx';
 import ModulePlaceholder from '../../../components/ui/ModulePlaceholder.jsx';
 import useCollarAlerts from '../hooks/useCollarAlerts.js';
+import useAlertAlarm from '../hooks/useAlertAlarm.js';
+import { formatGmtStamp } from '../domain/labels.js';
 
 // Modules this use case owns and therefore can actually open, mirroring the
 // owned entries in the shared rail.
@@ -37,20 +39,6 @@ const MODULE_OWNERS = {
     useCaseName: 'Referenced in the case study only',
     description:
       'The case study mentions motion-triggered camera traps, but no member owns a use case for reviewing their uploads.'
-  },
-  reports: {
-    title: 'Analytics reports',
-    owner: 'Wijesingha S M (IT23538214)',
-    useCaseName: 'Park Management and Patrol Analytics Reports',
-    description:
-      'Statistical reporting on incidents by type and location, patrol coverage and human-wildlife conflict trends.'
-  },
-  settings: {
-    title: 'Platform settings',
-    owner: 'Shared platform module',
-    useCaseName: 'Administration',
-    description:
-      'User accounts and park configuration are shared platform concerns rather than part of any single use case.'
   }
 };
 
@@ -63,6 +51,7 @@ const MODULE_OWNERS = {
  */
 export default function DashboardPage() {
   const alerts = useCollarAlerts();
+  const alarm = useAlertAlarm({ announcedAlerts: alerts.announced });
   const mapRef = useRef(null);
   const [activeModule, setActiveModule] = useState('alerts');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -70,6 +59,8 @@ export default function DashboardPage() {
   const {
     loading,
     error,
+    offline,
+    lastUpdatedAt,
     park,
     collars,
     zones,
@@ -78,10 +69,11 @@ export default function DashboardPage() {
     openAlerts,
     openAlertCounts,
     activeAlert,
+    bannerAlert,
     auditTrail,
     delayedAlerts,
+    dispatchAttempts,
     lostCollars,
-    sessionExpired,
     toast,
     visibleZoneIds
   } = alerts;
@@ -92,7 +84,6 @@ export default function DashboardPage() {
   // Named handlers rather than inline arrows, so each demo control is a
   // single, traceable call into the hook.
   const openRecords = () => setDrawerOpen((value) => !value);
-  const forceSessionExpiry = () => alerts.setSessionExpired(true);
   const forceSignalLoss = () => alerts.simulateSignalLost();
 
   /** Clicking a collar marker opens its alert, or just pans to it. */
@@ -129,7 +120,14 @@ export default function DashboardPage() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-park-900 pb-14 lg:pb-0">
-      {error && <ApiErrorBanner message={error} onRetry={alerts.refresh} />}
+      {error && (
+        <ApiErrorBanner
+          message={error}
+          offline={offline}
+          lastUpdatedAt={lastUpdatedAt}
+          onRetry={alerts.refresh}
+        />
+      )}
 
       <DashboardMap
         ref={mapRef}
@@ -201,6 +199,16 @@ export default function DashboardPage() {
         </>
       )}
 
+      {/* The persistent critical banner, independent of the modal: the officer
+          can close the modal and mute the alarm, and the breach is still open. */}
+      <CriticalAlertBanner
+        alert={bannerAlert}
+        count={openAlerts.length}
+        alarm={alarm}
+        onOpenAlert={alerts.selectAlert}
+        onSilence={() => alerts.silenceAlert(bannerAlert.alertId)}
+      />
+
       <SignalLostBanner collarIds={lostCollars} onDismiss={alerts.dismissSignalLost} />
 
       <OperationsDrawer
@@ -208,6 +216,7 @@ export default function DashboardPage() {
         onClose={() => setDrawerOpen(false)}
         delayedAlerts={delayedAlerts}
         auditTrail={auditTrail}
+        dispatchAttempts={dispatchAttempts}
         onSelectAlert={alerts.selectAlert}
         onDispatchPatrolCheck={alerts.decideDelayedPatrolCheck}
       />
@@ -218,27 +227,31 @@ export default function DashboardPage() {
         onOpenRecords={openRecords}
         onRefresh={alerts.refresh}
         onForceSignalLoss={forceSignalLoss}
-        onForceSessionExpiry={forceSessionExpiry}
       />
 
       <CriticalAlertModal
         alert={activeAlert}
         zone={activeZone}
         rangerTeams={rangerTeams}
+        dispatchAttempts={dispatchAttempts}
+        responding={alerts.responding[activeAlert?.alertId] ?? null}
+        onLoadDispatchAttempts={alerts.loadDispatchAttempts}
         onAcknowledgeDispatch={alerts.acknowledgeAndDispatch}
         onDispatchPatrolCheck={alerts.decideDelayedPatrolCheck}
         onMonitor={alerts.monitorClosely}
         onFalseAlarm={alerts.markFalseAlarm}
         onClose={alerts.closeAlert}
       />
-
-      <SessionExpiredOverlay open={sessionExpired} onResume={() => alerts.setSessionExpired(false)} />
     </div>
   );
 }
 
-/** Shows a backend/API failure rather than leaving a blank map. */
-function ApiErrorBanner({ message, onRetry }) {
+/**
+ * Backend/API failure rather than a blank map. Distinguishes "the API is
+ * unreachable" from "the API answered with an error", and says when the data
+ * on screen was last refreshed so a stale queue is never read as current.
+ */
+function ApiErrorBanner({ message, offline, lastUpdatedAt, onRetry }) {
   return (
     <div
       role="alert"
@@ -247,8 +260,15 @@ function ApiErrorBanner({ message, onRetry }) {
     >
       <div className="flex items-center gap-3">
         <div>
-          <p className="text-sm font-bold text-alert-600">Cannot reach the API</p>
+          <p className="text-sm font-bold text-alert-600">
+            {offline ? 'Cannot reach the API' : 'The API returned an error'}
+          </p>
           <p className="text-xs text-stone-700">{message}</p>
+          {lastUpdatedAt && (
+            <p className="text-[11px] text-stone-500">
+              Showing the last successful refresh at {formatGmtStamp(lastUpdatedAt)}.
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -263,7 +283,7 @@ function ApiErrorBanner({ message, onRetry }) {
 }
 
 /** Small strip of controls used to demonstrate the exception flows. */
-function DemoControls({ onOpenRecords, onRefresh, onForceSignalLoss, onForceSessionExpiry }) {
+function DemoControls({ onOpenRecords, onRefresh, onForceSignalLoss }) {
   return (
     <div className="absolute left-16 top-1/2 z-[700] hidden -translate-y-1/2 rounded-md bg-white/95 p-2
         shadow-lg lg:block">
@@ -272,7 +292,6 @@ function DemoControls({ onOpenRecords, onRefresh, onForceSignalLoss, onForceSess
         <DemoButton label="Records" onClick={onOpenRecords} />
         <DemoButton label="Refresh" onClick={onRefresh} />
         <DemoButton label="Signal lost" onClick={onForceSignalLoss} />
-        <DemoButton label="Session timeout" onClick={onForceSessionExpiry} />
       </div>
     </div>
   );

@@ -28,9 +28,13 @@ async function getGeofence(req, res, next) {
 // from the Geofences panel.
 async function updateGeofence(req, res, next) {
   try {
+    const { enabled } = req.body ?? {};
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean' });
+    }
     const zone = await Geofence.findOneAndUpdate(
       { zoneId: req.params.zoneId },
-      { $set: { enabled: req.body.enabled } },
+      { $set: { enabled } },
       { new: true }
     );
     if (!zone) return res.status(404).json({ message: 'Geofence not found' });

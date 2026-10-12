@@ -15,8 +15,10 @@ const {
   zoneKindLabel
 } = require('./geofenceService');
 const { isValidLngLat } = require('../utils/geo');
+const { deliverDispatch } = require('./notificationService');
 const {
   ALERT_STATUS,
+  RESPONSE_ACTION,
   COLLAR_STATUS,
   DISPATCH_STATE,
   DISPATCH_MAX_RETRIES,
@@ -31,18 +33,16 @@ const BREACH_DETAIL_TEMPLATE =
 const OPEN_STATUSES = [ALERT_STATUS.ACTIVE, ALERT_STATUS.ACKNOWLEDGED, ALERT_STATUS.DELAYED];
 const HANDLED_STATUSES = [ALERT_STATUS.DISMISSED, ALERT_STATUS.RESOLVED];
 
-/** Audit trail rows are addressable by their own reference, like every other collection. */
-let auditSequence = 0;
-
-function nextAuditId(at) {
-  auditSequence += 1;
-  return `AUD-${at.getTime()}-${String(auditSequence).padStart(4, '0')}`;
+/** Allocates the next audit reference. Atomic, like every other reference ID. */
+async function nextAuditId() {
+  const seq = await nextSequence('auditRef');
+  return `AUD-${String(seq).padStart(6, '0')}`;
 }
 
 /** Writes one audit trail row. Never throws into the caller's path. */
 async function writeAudit({ alertId = null, action, actor, detail, at = new Date() }) {
   return AuditEntry.create({
-    auditId: nextAuditId(new Date(at)),
+    auditId: await nextAuditId(),
     alertId,
     action,
     actor,
@@ -58,6 +58,27 @@ async function loadGeofenceContext() {
     Park.findOne().lean()
   ]);
   return { zones, settlements: park?.settlements ?? [] };
+}
+
+/**
+ * The event time of a fix. `undefined` means "live, stamp it now"; anything
+ * present must be a real instant, otherwise the caller gets a 400 rather than
+ * a misleading incident dated to the moment it was received.
+ */
+const MAX_FIX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function normalizeFixTime(value) {
+  if (value === undefined || value === null || value === '') return new Date();
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.valueOf())) {
+    throw Object.assign(new Error('at must be a valid ISO-8601 timestamp'), { statusCode: 400 });
+  }
+  // Collars replay a buffered batch after a dropout, but a timestamp years old
+  // is a clock fault rather than telemetry; treat it as stale, not as a breach.
+  if (Date.now() - parsed.valueOf() > MAX_FIX_AGE_MS) {
+    throw Object.assign(new Error('Fix timestamp is too old to be a real collar reading'), { statusCode: 400 });
+  }
+  return parsed;
 }
 
 /**
@@ -93,16 +114,25 @@ async function nextAlertRef() {
  * @param {object} fix { collarId, coordinates: [lng, lat], at, delayed }
  */
 async function ingestFix(fix, context) {
-  const { collarId, coordinates, at = new Date(), delayed = false } = fix;
+  const { collarId, coordinates } = fix;
 
+  if (!collarId || typeof collarId !== 'string') {
+    throw Object.assign(new Error('collarId is required'), { statusCode: 400 });
+  }
   if (!Array.isArray(coordinates) || coordinates.length !== 2 || !isValidLngLat(coordinates[0], coordinates[1])) {
     throw Object.assign(new Error('Invalid coordinates'), { statusCode: 400 });
   }
+
+  // A fix without a usable time cannot be ordered, audited or shown as a breach
+  // time, so it is rejected rather than silently recorded as "now".
+  const at = normalizeFixTime(fix.at);
 
   const collar = await Collar.findOne({ collarId });
   if (!collar) {
     throw Object.assign(new Error(`Unknown collar ${collarId}`), { statusCode: 404 });
   }
+
+  const delayed = Boolean(fix.delayed);
 
   // Persist the fix regardless of whether it breaches: alternate flow A
   // requires standard background tracking to continue uninterrupted.
@@ -201,29 +231,53 @@ async function ingestBatch(fixes, { delayed = false } = {}) {
 
 /**
  * Sends the dispatch notification to the ranger mobile unit, retrying up to
- * DISPATCH_MAX_RETRIES times (exception flow 3). Delivery is attempted
- * through the notification service; on total failure the officer is told to
- * fall back to radio.
+ * DISPATCH_MAX_RETRIES times (exception flow 3). Every attempt is written to
+ * DispatchAttempt, so the officer can see a requested dispatch, the attempts
+ * that were delivered, and the ones that failed. On total failure the officer
+ * is told to fall back to radio.
+ *
+ * Attempt numbers continue from what the alert already has, rather than
+ * restarting at 1 for each dispatch. An officer may re-task an acknowledged
+ * alert, and a log that reads 1,2,3,1,2,3 is ambiguous about which round
+ * failed.
+ *
+ * `deliver` defaults to the real notification channel; tests inject their own.
  */
-async function sendDispatch(alert, ranger, { deliver = () => Promise.resolve(true) } = {}) {
+async function sendDispatch(alert, ranger, { deliver = deliverDispatch } = {}) {
+  let lastError = null;
+  const alreadyLogged = await DispatchAttempt.countDocuments({ alertId: alert.alertId });
   for (let attempt = 1; attempt <= DISPATCH_MAX_RETRIES; attempt += 1) {
-    const ok = await deliver({ alert, ranger, attempt });
+    const sequence = alreadyLogged + attempt;
+    let ok = false;
+    try {
+      ok = (await deliver({ alert, ranger, attempt: sequence })) === true;
+    } catch (error) {
+      ok = false;
+      lastError = error;
+    }
     await DispatchAttempt.create({
       alertId: alert.alertId,
       rangerId: ranger?.rangerId ?? null,
       rangerName: ranger?.name ?? null,
-      attempt,
+      attempt: sequence,
+      // A failed attempt stays 'sending' while the loop retries; the whole set
+      // is flipped to 'failed' below if none of them lands.
       state: ok ? DISPATCH_STATE.DELIVERED : DISPATCH_STATE.SENDING,
       error: ok ? null : 'Ranger mobile unit unreachable'
     });
-    if (ok) return { delivered: true, attempts: attempt };
+    if (ok) return { delivered: true, attempts: sequence };
   }
 
   await DispatchAttempt.updateMany(
-    { alertId: alert.alertId },
+    { alertId: alert.alertId, attempt: { $gt: alreadyLogged } },
     { $set: { state: DISPATCH_STATE.FAILED } }
   );
-  return { delivered: false, attempts: DISPATCH_MAX_RETRIES, error: 'Ranger mobile unit unreachable' };
+  return {
+    delivered: false,
+    attempts: alreadyLogged + DISPATCH_MAX_RETRIES,
+    error: lastError?.message ?? 'Ranger mobile unit unreachable',
+    fallback: 'Contact the ranger team by radio.'
+  };
 }
 
 /**
@@ -234,12 +288,22 @@ async function respondToAlert(alertId, action, { actor = 'officer', notes = null
   const alert = await BoundaryAlert.findOne({ alertId });
   if (!alert) throw Object.assign(new Error('Alert not found'), { statusCode: 404 });
 
+  // An officer who dismissed or resolved an incident must not be able to
+  // re-open it with a second click, and the status must never move backwards
+  // out of a terminal state.
+  if (HANDLED_STATUSES.includes(alert.status)) {
+    throw Object.assign(
+      new Error(`Alert ${alertId} is already ${alert.status} and cannot be actioned again`),
+      { statusCode: 409 }
+    );
+  }
+
   const handled = { handledBy: actor, handledAt: new Date(), responseAction: action };
   let audit;
   let patch = {};
 
   switch (action) {
-    case 'acknowledge_dispatch': {
+    case RESPONSE_ACTION.ACKNOWLEDGE_DISPATCH: {
       const rangers = await RangerTeam.find().lean();
       const ranger = findNearestRanger(alert.position, rangers);
 
@@ -275,21 +339,21 @@ async function respondToAlert(alertId, action, { actor = 'officer', notes = null
         action: outcome.delivered ? AUDIT_ACTION.RANGER_DISPATCHED : AUDIT_ACTION.DISPATCH_FAILED,
         actor: 'NotificationService',
         detail: outcome.delivered
-          ? `${ranger?.name ?? 'Nearest ranger team'} dispatched after ${outcome.attempts} attempt(s).`
-          : `Dispatch failed after ${outcome.attempts} retries. Use radio.`
+          ? `${ranger?.name ?? 'Nearest ranger team'} notified after ${outcome.attempts} attempt(s).`
+          : `Dispatch failed after ${outcome.attempts} retries. Contact the ranger team by radio.`
       });
 
       return { alert, dispatch: outcome, ranger };
     }
 
-    case 'monitor_closely':
+    case RESPONSE_ACTION.MONITOR_CLOSELY:
       // The officer is tracking it, so the episode stays open and no new
       // alert is raised while they watch.
       patch = { ...handled, status: ALERT_STATUS.ACKNOWLEDGED };
       audit = { action: AUDIT_ACTION.MONITOR_CLOSELY, detail: 'Officer elected to monitor the animal closely without dispatch.' };
       break;
 
-    case 'mark_false_alarm':
+    case RESPONSE_ACTION.MARK_FALSE_ALARM:
       // Alternate flow C. The officer note is the evidence that the breach
       // was collar signal drift, so it is required.
       if (!notes || !notes.trim()) {
@@ -299,7 +363,7 @@ async function respondToAlert(alertId, action, { actor = 'officer', notes = null
       audit = { action: AUDIT_ACTION.MARKED_FALSE_ALARM, detail: notes.trim() };
       break;
 
-    case 'dispatch_patch_check': {
+    case RESPONSE_ACTION.DISPATCH_PATCH_CHECK: {
       // Alternate flow D: a retroactive breach the officer has accepted.
       const rangers = await RangerTeam.find().lean();
       const ranger = findNearestRanger(alert.position, rangers);
@@ -318,15 +382,20 @@ async function respondToAlert(alertId, action, { actor = 'officer', notes = null
       alert.dispatchState = outcome.delivered ? DISPATCH_STATE.DELIVERED : DISPATCH_STATE.FAILED;
       alert.dispatchAttempts = outcome.attempts;
       alert.dispatchedTo = outcome.delivered ? (ranger?.name ?? null) : null;
+      alert.dispatchedRangerId = outcome.delivered ? (ranger?.rangerId ?? null) : null;
       await alert.save();
+
+      if (outcome.delivered && ranger) {
+        await RangerTeam.updateOne({ rangerId: ranger.rangerId }, { $set: { status: 'dispatched' } });
+      }
 
       await writeAudit({
         alertId,
         action: outcome.delivered ? AUDIT_ACTION.RANGER_DISPATCHED : AUDIT_ACTION.DISPATCH_FAILED,
         actor: 'NotificationService',
         detail: outcome.delivered
-          ? `${ranger?.name ?? 'Ranger team'} tasked with delayed patrol check.`
-          : 'Dispatch failed after 3 retries. Use radio.'
+          ? `${ranger?.name ?? 'Ranger team'} notified to run a patrol check.`
+          : `Dispatch failed after ${DISPATCH_MAX_RETRIES} retries. Contact the ranger team by radio.`
       });
 
       return { alert, dispatch: outcome, ranger };
@@ -363,5 +432,7 @@ module.exports = {
   listAlerts,
   writeAudit,
   nextAlertRef,
-  OPEN_STATUSES
+  normalizeFixTime,
+  OPEN_STATUSES,
+  HANDLED_STATUSES
 };

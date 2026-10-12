@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Topbar from '../src/layout/Topbar.jsx';
 import App from '../src/App.jsx';
 import LoginPage from '../src/pages/LoginPage.jsx';
-import ManagerShell from '../src/features/reports/components/ManagerShell.jsx';
+import AnalyticsShell from '../src/features/reports/components/AnalyticsShell.jsx';
 import {
   SESSION_KEY,
   readSession,
@@ -116,6 +116,15 @@ describe('dashboard session', () => {
     expect(roleLabel(null)).toBe('Operations Officer');
     expect(initialsOf('Nimali Perera')).toBe('NP');
     expect(initialsOf('Ranger')).toBe('RA');
+  });
+
+  it('takes initials from words, not punctuation', () => {
+    // "Operations Officer (Demo)" used to render the avatar "O(".
+    expect(initialsOf('Operations Officer (Demo)')).toBe('OO');
+    expect(initialsOf('Bandula R. Perera')).toBe('BP');
+    expect(initialsOf('  ')).toBe('');
+    expect(initialsOf(null)).toBe('');
+    expect(initialsOf('!!!')).toBe('');
   });
 
   it('gives each web role its own home in the portal', () => {
@@ -302,7 +311,7 @@ describe('portal route guard', () => {
     // "/" is not the manager's home: the catch-all sends them to analytics.
     expect(screen.getByText('Analytics reports')).toBeInTheDocument();
     expect(screen.queryByText('Officer dashboard')).not.toBeInTheDocument();
-    expect(screen.getByText('Bandula Perera')).toBeInTheDocument();
+    expect(screen.getByText('Park Manager')).toBeInTheDocument();
   });
 
   it('sends a manager to their own home from an unknown URL', () => {
@@ -327,6 +336,58 @@ describe('portal route guard', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('turns away a ranger session even if one is stored', () => {
+    storeSession({ ...OFFICER, role: 'ranger' });
+
+    render(
+      <MemoryRouter initialEntries={['/analytics/type']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('gives the Operations Officer the analytical reports the Park Manager uses', () => {
+    storeSession(OFFICER);
+
+    render(
+      <MemoryRouter initialEntries={['/analytics/type']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Analytics reports')).toBeInTheDocument();
+    expect(screen.getByText('Operations Officer')).toBeInTheDocument();
+    // And a visible route back out of the Park Manager's workspace.
+    expect(screen.getByRole('link', { name: /Back to dashboard/ })).toHaveAttribute('href', '/');
+  });
+
+  it('sends an officer typing /reports to the working analytics workspace', () => {
+    storeSession(OFFICER);
+
+    render(
+      <MemoryRouter initialEntries={['/reports']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Analytics reports')).toBeInTheDocument();
+  });
+
+  it('has no /admin route for the Operations Officer', () => {
+    storeSession(OFFICER);
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    // Unknown URLs return each role to its own home, never to a dead admin page.
+    expect(screen.getByText('Officer dashboard')).toBeInTheDocument();
   });
 
   it('waits for the app to hand over the session instead of flashing sign-in', async () => {
@@ -367,8 +428,9 @@ describe('Topbar sign out', () => {
 
     render(<MemoryRouter><Topbar /></MemoryRouter>);
 
-    expect(screen.getByText('Nimali Perera')).toBeInTheDocument();
+    // The role is the only label: the display name beside it repeated it.
     expect(screen.getByText('Operations Officer')).toBeInTheDocument();
+    expect(screen.queryByText('Nimali Perera')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
@@ -386,19 +448,59 @@ describe('Topbar sign out', () => {
     expect(readSession()).toBeNull();
   });
 
-  it('gives the manager workspace its own sign out', async () => {
+  it('gives the analytics workspace its own sign out', async () => {
     const user = userEvent.setup();
     storeSession({ ...OFFICER, role: 'manager', name: 'Bandula Perera' });
 
     render(
       <MemoryRouter>
-        <ManagerShell><div>Analytics reports</div></ManagerShell>
+        <AnalyticsShell><div>Analytics reports</div></AnalyticsShell>
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Bandula Perera')).toBeInTheDocument();
+    expect(screen.getByText('Park Manager')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(readSession()).toBeNull();
+  });
+
+  // The officer reaches this workspace from the top bar, so it has to carry a
+  // route back out — otherwise they are stuck in the Park Manager's view.
+  it('offers the Operations Officer a way back to the alert dashboard', () => {
+    storeSession(OFFICER);
+
+    render(
+      <MemoryRouter initialEntries={['/analytics/type']}>
+        <AnalyticsShell><div>Analytics reports</div></AnalyticsShell>
+      </MemoryRouter>
+    );
+
+    const back = screen.getByRole('link', { name: /Back to dashboard/ });
+    expect(back).toHaveAttribute('href', '/');
+  });
+
+  it('offers the Park Manager no dashboard link: this is their home', () => {
+    storeSession({ ...OFFICER, role: 'manager' });
+
+    render(
+      <MemoryRouter initialEntries={['/analytics/type']}>
+        <AnalyticsShell><div>Analytics reports</div></AnalyticsShell>
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('link', { name: /Back to dashboard/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the role once in the analytics workspace', () => {
+    storeSession(OFFICER);
+
+    render(
+      <MemoryRouter>
+        <AnalyticsShell><div>Analytics reports</div></AnalyticsShell>
+      </MemoryRouter>
+    );
+
+    expect(screen.getAllByText('Operations Officer')).toHaveLength(1);
+    expect(screen.queryByText('Nimali Perera')).not.toBeInTheDocument();
   });
 });

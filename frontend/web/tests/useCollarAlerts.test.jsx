@@ -54,6 +54,7 @@ beforeEach(() => {
   vi.spyOn(api, 'getRangerTeams').mockImplementation(() => Promise.resolve(responses.teams));
   vi.spyOn(api, 'getAlerts').mockImplementation(() => Promise.resolve(responses.alerts));
   vi.spyOn(api, 'getAuditTrail').mockImplementation(() => Promise.resolve(responses.audit));
+  vi.spyOn(api, 'getDispatchAttempts').mockImplementation(() => Promise.resolve(responses.attempts ?? []));
 });
 
 afterEach(() => {
@@ -297,11 +298,77 @@ describe('demo controls', () => {
     expect(responses.collars[0].status).toBe('signal_lost');
   });
 
-  it('toggles the session expired overlay', async () => {
+  it('announces every alert once, so a poll refresh never re-announces the same breach', async () => {
     const { result } = await mount();
-    expect(result.current.sessionExpired).toBe(false);
-    act(() => result.current.setSessionExpired(true));
-    expect(result.current.sessionExpired).toBe(true);
+    // The server already returns the queue in priority order, so the first
+    // unseen entry is the one the officer has to handle first.
+    expect(result.current.announced.map((a) => a.alertId)).toEqual(['CBA-2', 'CBA-1']);
+    expect(result.current.activeAlert.alertId).toBe('CBA-2');
+
+    // The 3s poll returns the same open alerts; nothing new is announced.
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.announced.map((a) => a.alertId)).toEqual(['CBA-2', 'CBA-1']);
+
+    responses.alerts = [{ ...ALERTS[1], alertId: 'CBA-3' }, ...ALERTS];
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.announced.map((a) => a.alertId)).toEqual(['CBA-3']);
+    expect(result.current.activeAlert.alertId).toBe('CBA-3');
+  });
+
+  it('keeps the banner on the highest priority open alert until it is silenced', async () => {
+    const { result } = await mount();
+    expect(result.current.bannerAlert.alertId).toBe('CBA-2');
+
+    act(() => result.current.silenceAlert('CBA-2'));
+    expect(result.current.bannerAlert.alertId).toBe('CBA-1');
+
+    act(() => result.current.unsilenceAlert('CBA-2'));
+    expect(result.current.bannerAlert.alertId).toBe('CBA-2');
+  });
+
+  it('refuses a second response while the first is still in flight', async () => {
+    const { result } = await mount();
+    let release;
+    vi.spyOn(api, 'respondToAlert').mockImplementation(
+      () => new Promise((resolve) => { release = resolve; })
+    );
+
+    let first;
+    let second;
+    await act(async () => {
+      first = result.current.acknowledgeAndDispatch('CBA-1');
+      second = result.current.acknowledgeAndDispatch('CBA-1');
+    });
+
+    expect(api.respondToAlert).toHaveBeenCalledTimes(1);
+    expect(result.current.responding['CBA-1']).toBe('acknowledge_dispatch');
+
+    await act(async () => { release({ alert: {}, dispatch: { delivered: true } }); await first; });
+    expect(await second).toBeNull();
+    expect(result.current.responding['CBA-1']).toBeUndefined();
+  });
+
+  it('tells an unreachable API apart from a server error', async () => {
+    const network = new api.ApiError('Cannot reach the API. Is the backend running?', 0);
+    vi.spyOn(api, 'getAlerts').mockRejectedValueOnce(network);
+    const offlineView = await mount();
+    expect(offlineView.result.current.offline).toBe(true);
+    expect(offlineView.result.current.error).toMatch(/Cannot reach the API/);
+
+    vi.spyOn(api, 'getAlerts').mockRejectedValueOnce(new api.ApiError('Request failed (500)', 500));
+    const serverView = await mount();
+    expect(serverView.result.current.offline).toBe(false);
+    expect(serverView.result.current.error).toBe('Request failed (500)');
+  });
+
+  it('loads the delivery-attempt log for an alert', async () => {
+    responses.attempts = [{ alertId: 'CBA-1', attempt: 1, state: 'failed', error: 'unreachable' }];
+    const { result } = await mount();
+    let loaded;
+    await act(async () => { loaded = await result.current.loadDispatchAttempts('CBA-1'); });
+    expect(api.getDispatchAttempts).toHaveBeenCalledWith('CBA-1');
+    expect(loaded).toHaveLength(1);
+    expect(result.current.dispatchAttempts).toHaveLength(1);
   });
 
   it('dismisses the toast', async () => {

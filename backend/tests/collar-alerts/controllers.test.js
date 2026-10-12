@@ -67,6 +67,7 @@ beforeEach(() => {
     attemptFind: vi.fn(() => chain([])),
     attemptCreate: vi.fn((doc) => Promise.resolve(doc)),
     attemptUpdateMany: vi.fn(() => Promise.resolve({})),
+    attemptCountDocuments: vi.fn(() => Promise.resolve(0)),
     geofenceFind: vi.fn(() => chain([])),
     geofenceFindOne: vi.fn(() => chain(null)),
     geofenceFindOneAndUpdate: vi.fn(() => Promise.resolve(null)),
@@ -91,6 +92,7 @@ beforeEach(() => {
   });
   Object.assign(AuditEntry, { create: spies.auditCreate, find: spies.auditFind });
   Object.assign(DispatchAttempt, {
+    countDocuments: spies.attemptCountDocuments,
     find: spies.attemptFind,
     create: spies.attemptCreate,
     updateMany: spies.attemptUpdateMany
@@ -143,15 +145,30 @@ describe('collarController', () => {
   it('registers a new collar and audits it', async () => {
     spies.collarFindOne.mockResolvedValue(null);
     const res = makeRes();
-    await collarController.registerCollar({ body: { collarId: 'E-777', species: 'Elephant' } }, res, vi.fn());
+    await collarController.registerCollar(
+      { body: { collarId: 'E-777', gpsDeviceId: 'GPS-9999', species: 'Elephant' } },
+      res,
+      vi.fn()
+    );
     expect(res.statusCode).toBe(201);
     expect(spies.auditCreate).toHaveBeenCalled();
+  });
+
+  it('400s when a new collar is missing the fields the registry needs', async () => {
+    const res = makeRes();
+    await collarController.registerCollar({ body: { collarId: 'E-777', species: 'Elephant' } }, res, vi.fn());
+    expect(res.statusCode).toBe(400);
+    expect(spies.collarCreate).not.toHaveBeenCalled();
   });
 
   it('409s when the collar is already registered', async () => {
     spies.collarFindOne.mockResolvedValue({ collarId: 'E-402' });
     const res = makeRes();
-    await collarController.registerCollar({ body: { collarId: 'E-402' } }, res, vi.fn());
+    await collarController.registerCollar(
+      { body: { collarId: 'E-402', gpsDeviceId: 'GPS-8841', species: 'Elephant' } },
+      res,
+      vi.fn()
+    );
     expect(res.statusCode).toBe(409);
     expect(spies.collarCreate).not.toHaveBeenCalled();
   });
@@ -364,42 +381,30 @@ describe('alertController', () => {
     expect(res.payload.ranger.rangerId).toBe('RT-01');
   });
 
-  it('refuses a false alarm with no notes and passes the 400 on', async () => {
-    const alert = {
-      alertId: 'CBA-2026-0001',
-      position: [80.99, 8.24],
-      status: 'active',
-      save: vi.fn().mockResolvedValue(undefined),
-      toObject() { return { alertId: this.alertId }; }
-    };
-    spies.alertFindOne.mockResolvedValue(alert);
-
+  it('refuses a false alarm with no notes, without touching the alert', async () => {
     const next = vi.fn();
+    const res = makeRes();
     await alertController.respondToAlert(
       { params: { alertId: 'CBA-2026-0001' }, body: { action: 'mark_false_alarm' } },
-      makeRes(),
+      res,
       next
     );
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(res.statusCode).toBe(400);
+    expect(next).not.toHaveBeenCalled();
+    expect(spies.alertFindOne).not.toHaveBeenCalled();
   });
 
-  it('rejects an unsupported action with a 400', async () => {
-    const alert = {
-      alertId: 'CBA-1',
-      position: [80.99, 8.24],
-      status: 'active',
-      save: vi.fn().mockResolvedValue(undefined),
-      toObject() { return { alertId: this.alertId }; }
-    };
-    spies.alertFindOne.mockResolvedValue(alert);
-
+  it('rejects an unsupported action with a 400 before touching the alert', async () => {
     const next = vi.fn();
+    const res = makeRes();
     await alertController.respondToAlert(
       { params: { alertId: 'CBA-1' }, body: { action: 'launch_missiles' } },
-      makeRes(),
+      res,
       next
     );
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(res.statusCode).toBe(400);
+    expect(next).not.toHaveBeenCalled();
+    expect(spies.alertFindOne).not.toHaveBeenCalled();
   });
 
   it('404s when responding to an alert that does not exist', async () => {
@@ -414,11 +419,26 @@ describe('alertController', () => {
   });
 
   it('lists dispatch attempts for an alert', async () => {
+    spies.alertFindOne.mockReturnValue(chain({ alertId: 'CBA-1' }));
     spies.attemptFind.mockReturnValue(chain([{ attempt: 1 }, { attempt: 2 }, { attempt: 3 }]));
     const res = makeRes();
     await alertController.getDispatchAttempts({ params: { alertId: 'CBA-1' } }, res, vi.fn());
     expect(spies.attemptFind).toHaveBeenCalledWith({ alertId: 'CBA-1' });
     expect(res.payload).toHaveLength(3);
+  });
+
+  it('404s dispatch attempts for an alert that does not exist', async () => {
+    spies.alertFindOne.mockReturnValue(chain(null));
+    const res = makeRes();
+    await alertController.getDispatchAttempts({ params: { alertId: 'CBA-nope' } }, res, vi.fn());
+    expect(res.statusCode).toBe(404);
+    expect(spies.attemptFind).not.toHaveBeenCalled();
+  });
+
+  it('rejects a nonsense limit instead of passing it to MongoDB', async () => {
+    const res = makeRes();
+    await alertController.getAlerts({ query: { limit: '99999' } }, res, vi.fn());
+    expect(res.statusCode).toBe(400);
   });
 });
 
