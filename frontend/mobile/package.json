@@ -5,7 +5,8 @@
   "scripts": {
     "start": "expo start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/react": "~19.2.4",
+    "@vitest/coverage-v8": "^2.1.8",
     "typescript": "~6.0.3",
     "vitest": "^2.1.9"
   }

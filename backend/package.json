@@ -8,12 +8,14 @@
     "test": "npm run test:jest && npm run test:vitest",
     "test:jest": "jest --runInBand",
     "test:vitest": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:jest": "jest --runInBand --coverage"
   },
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "<rootDir>/tests/*.test.js"
+      "<rootDir>/tests/*.test.js",
+      "<rootDir>/tests/conflict-report-submit-villager/*.test.js"
     ],
     "setupFiles": [
       "<rootDir>/tests/setupEnv.js"
