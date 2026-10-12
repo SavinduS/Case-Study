@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Topbar from './layout/Topbar.jsx';
+import { usePortalSession } from './layout/usePortalSession.js';
 import { OfflineBanner } from './offline/SyncBadge.jsx';
 import DashboardPage from './features/collar-alerts/pages/DashboardPage.jsx';
 import TriagePage from './features/field-incidents/pages/TriagePage.jsx';
@@ -8,6 +9,8 @@ import ReportsPage from './features/reports/pages/ReportsPage.jsx';
 import SavedReportsPage from './features/reports/pages/SavedReportsPage.jsx';
 import ManagerShell from './features/reports/components/ManagerShell.jsx';
 import ComparisonPage from './features/reports/pages/ComparisonPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import { DASHBOARD_ROLES } from './services/session.js';
 
 /**
  * Operations dashboard shell for the Wildlife Conservation Portal.
@@ -15,13 +18,29 @@ import ComparisonPage from './features/reports/pages/ComparisonPage.jsx';
  * The Collar Boundary Alerts route is fully implemented here. The other
  * portal tabs belong to the remaining use cases in Group 033's design and
  * render an explicit placeholder naming the owning member.
+ *
+ * Every route except /login needs a session: either one started here with the
+ * sign-in page, or one the mobile app handed over when the dashboard is shown
+ * inside the app's WebView.
  */
 export default function App() {
   const { pathname } = useLocation();
+  const { session, waiting } = usePortalSession();
+  const isLogin = pathname === '/login';
   const isManagerAnalytics = pathname === '/analytics/type' || pathname.startsWith('/analytics/type/');
   const isManagerWorkspace = isManagerAnalytics
     || pathname === '/analytics/comparison'
     || pathname === '/analytics/saved';
+
+  if (isLogin) return <LoginPage />;
+
+  // Inside the app the session may still be on its way; show nothing rather
+  // than bouncing to the sign-in page and back.
+  if (waiting) return null;
+
+  if (!session || !DASHBOARD_ROLES.includes(session.role)) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="h-screen">

@@ -5,13 +5,29 @@ const config = require('../config');
 
 const ROLES = ['villager', 'ranger', 'officer', 'manager'];
 
+// Deliberately permissive: the goal is to catch typos such as "nimali@" or
+// "name.example.com", not to argue with RFC 5322.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 function signToken(user) {
   return jwt.sign({ sub: user._id.toString(), role: user.role }, config.jwtSecret, { expiresIn: '7d' });
+}
+
+// The mobile client renders the signed-in user's name and role straight after
+// login, so both travel with the token instead of costing a second request.
+function sessionPayload(user, token) {
+  return { id: user._id, name: user.name, role: user.role, token };
+}
+
+// Emails are matched case-insensitively (the schema lowercases on write).
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
 async function register(req, res, next) {
   try {
     const { name, phone, password, role } = req.body;
+    const email = normalizeEmail(req.body.email);
     if (!name || !phone || !password) {
       return res.status(400).json({ message: 'name, phone and password are required' });
     }
@@ -21,25 +37,57 @@ async function register(req, res, next) {
     if (role && !ROLES.includes(role)) {
       return res.status(400).json({ message: `role must be one of: ${ROLES.join(', ')}` });
     }
+    if (req.body.email && !EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({ message: 'email is not a valid address' });
+    }
     const exists = await User.findOne({ phone });
     if (exists) return res.status(409).json({ message: 'Phone already registered' });
+    if (email) {
+      const emailTaken = await User.findOne({ email });
+      if (emailTaken) return res.status(409).json({ message: 'Email already registered' });
+    }
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, phone, passwordHash, role: role || 'villager' });
-    res.status(201).json({ id: user._id, role: user.role, token: signToken(user) });
+    const user = await User.create({
+      name,
+      phone,
+      email: email || undefined,
+      passwordHash,
+      role: role || 'villager'
+    });
+    res.status(201).json(sessionPayload(user, signToken(user)));
   } catch (e) { next(e); }
 }
 
 async function login(req, res, next) {
   try {
-    const { phone, password } = req.body;
-    if (!phone || !password) {
-      return res.status(400).json({ message: 'phone and password are required' });
+    // One field that is either an email address or a phone number. `phone` is
+    // still accepted so existing clients and scripts keep working.
+    const identifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ''
+    ).trim();
+    const { password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'email or phone and password are required' });
     }
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({
+      $or: [{ phone: identifier }, { email: normalizeEmail(identifier) }]
+    });
     const ok = user && (await bcrypt.compare(password, user.passwordHash));
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
-    res.json({ id: user._id, role: user.role, token: signToken(user) });
+    res.json(sessionPayload(user, signToken(user)));
   } catch (e) { next(e); }
 }
 
-module.exports = { register, login };
+// Restores a session on app start: the phone kept the token from the previous
+// login, so prove it is still valid and hand back the current user. A deleted
+// user is reported as 401 so the client signs out instead of trusting a role
+// that no longer exists.
+async function me(req, res, next) {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(401).json({ message: 'Account no longer exists' });
+    res.json({ id: user._id, name: user.name, role: user.role });
+  } catch (e) { next(e); }
+}
+
+module.exports = { register, login, me };

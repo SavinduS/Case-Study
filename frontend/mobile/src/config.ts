@@ -3,6 +3,8 @@ import Constants from 'expo-constants';
 // Explicit override from frontend/mobile/.env (see .env.example). The app
 // normally finds the backend on its own; this pins a specific address.
 const envBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+// Explicit override for the dashboard address used by the web-UI handoff.
+const envWeb = process.env.EXPO_PUBLIC_WEB_UI_URL ?? '';
 
 // Static fallback: the Android emulator reaches the host PC as 10.0.2.2.
 // No LAN IP is hardcoded — on a real device the address comes from the
@@ -35,4 +37,20 @@ export function apiBaseCandidates(): string[] {
   }
   add(EMULATOR_BASE);
   return bases;
+}
+
+// Port the Vite dev server for the web dashboard listens on (frontend/web
+// vite.config.js). Manager and Officer sign-in lands here inside a WebView.
+export const WEB_UI_PORT = 5173;
+
+/**
+ * Address of the web dashboard, used for the manager/officer handoff. It runs
+ * on the same host as the API, so one EXPO_PUBLIC_WEB_UI_URL override covers
+ * both when the automatic host detection is not enough.
+ */
+export function webUiUrl(): string {
+  if (envWeb) return envWeb;
+  const host = getHostAddress();
+  if (!host) return `http://localhost:${WEB_UI_PORT}`;
+  return `http://${host}:${WEB_UI_PORT}`;
 }

@@ -55,6 +55,13 @@ export const getGeofences = () => request('/geofences');
 export const getCollars = () => request('/collars');
 export const getRangerTeams = () => request('/parks/ranger-teams');
 
+/**
+ * Sign in to the portal. `identifier` is an email address or a phone number.
+ * Returns `{ id, name, role, token }` — the role is decided by the server.
+ */
+export const login = (identifier, password) =>
+  request('/auth/login', { method: 'POST', body: { identifier, password } });
+
 /** Open alerts, already ordered by the server's priority score. */
 export const getAlerts = () => request('/alerts');
 
