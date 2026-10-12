@@ -1,9 +1,9 @@
 const request = require('supertest');
 const fs = require('fs');
 const path = require('path');
-const app = require('../app');
-const ConflictReport = require('../models/ConflictReport');
-const { connectTestDb, resetTestDb, disconnectTestDb } = require('./helpers/db');
+const app = require('../../app');
+const ConflictReport = require('../../models/ConflictReport');
+const { connectTestDb, resetTestDb, disconnectTestDb } = require('../helpers/db');
 
 jest.setTimeout(60000);
 
@@ -278,7 +278,7 @@ describe('POST /api/conflict-reports/photo (FR-07, E5)', () => {
       });
     expect(res.status).toBe(201);
     expect(res.body.photoUrl).toMatch(/^\/uploads\/photo-.*\.jpg$/);
-    const file = path.join(__dirname, '..', 'uploads', path.basename(res.body.photoUrl));
+    const file = path.join(__dirname, '..', '..', 'uploads', path.basename(res.body.photoUrl));
     if (fs.existsSync(file)) fs.unlinkSync(file);
   });
 

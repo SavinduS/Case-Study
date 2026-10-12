@@ -1,4 +1,4 @@
-const { parseSms } = require('../utils/smsParser');
+const { parseSms } = require('../../utils/smsParser');
 
 describe('parseSms', () => {
   test('parses numeric format with area code', () => {

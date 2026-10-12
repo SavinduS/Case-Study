@@ -14,7 +14,8 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "<rootDir>/tests/*.test.js"
+      "<rootDir>/tests/*.test.js",
+      "<rootDir>/tests/conflict-report-submit-villager/*.test.js"
     ],
     "setupFiles": [
       "<rootDir>/tests/setupEnv.js"

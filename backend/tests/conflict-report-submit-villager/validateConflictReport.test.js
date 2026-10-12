@@ -1,4 +1,4 @@
-const { validateConflictReport, MAX_DESCRIPTION } = require('../utils/validateConflictReport');
+const { validateConflictReport, MAX_DESCRIPTION } = require('../../utils/validateConflictReport');
 
 const valid = {
   incidentType: 'elephant_sighting',
