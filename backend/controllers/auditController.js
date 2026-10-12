@@ -5,10 +5,14 @@ const { ingestBatch } = require('../services/alertService');
 async function listAuditEntries(req, res, next) {
   try {
     const { alertId, limit } = req.query;
+    const parsedLimit = limit === undefined ? 200 : Number(limit);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
+      return res.status(400).json({ message: 'limit must be an integer between 1 and 1000' });
+    }
     const filter = alertId ? { alertId } : {};
     const entries = await AuditEntry.find(filter)
       .sort({ at: -1 })
-      .limit(limit ? Number(limit) : 200)
+      .limit(parsedLimit)
       .lean();
     res.json(entries);
   } catch (e) { next(e); }

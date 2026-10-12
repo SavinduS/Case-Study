@@ -26,7 +26,8 @@ export default function DispatchToast({ toast, onDismiss, timeoutMs = 6000 }) {
     <div
       role="status"
       aria-live="polite"
-      className={`absolute bottom-4 right-[22.5rem] z-[800] w-64 rounded-md bg-white p-3 shadow-xl ring-2 ${tone.ring}`}
+      className={`absolute inset-x-3 bottom-4 z-[800] rounded-md bg-white p-3 shadow-xl ring-2
+        lg:inset-x-auto lg:right-[22.5rem] lg:w-64 ${tone.ring}`}
     >
       <div className="flex items-start gap-2">
         <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-white ${tone.badge}`}>

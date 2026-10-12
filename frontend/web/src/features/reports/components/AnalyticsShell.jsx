@@ -5,8 +5,7 @@ import { initialsOf, isEmbedded, roleLabel, signOut } from '../../../services/se
 const NAV = [
   { to: '/analytics/type', label: 'Analytics' },
   { to: '/analytics/comparison', label: 'Comparison' },
-  { to: '/analytics/saved', label: 'Saved reports' },
-  { to: '/analytics/zones', label: 'Zone settings' }
+  { to: '/analytics/saved', label: 'Saved reports' }
 ];
 
 /**

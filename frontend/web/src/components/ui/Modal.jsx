@@ -28,7 +28,7 @@ export default function Modal({ open, onClose, labelledBy, children, width = 'ma
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[1200] flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div
         className="absolute inset-0 bg-black/60"
         aria-hidden="true"
@@ -40,8 +40,9 @@ export default function Modal({ open, onClose, labelledBy, children, width = 'ma
         aria-modal="true"
         aria-labelledby={labelledBy}
         tabIndex={-1}
-        className={`relative w-full ${width} overflow-hidden rounded-lg bg-white shadow-2xl
-          outline-none ring-1 ring-black/10`}
+        className={`relative flex max-h-[92vh] w-full flex-col overflow-y-auto overscroll-contain
+          rounded-t-2xl bg-white shadow-2xl outline-none ring-1 ring-black/10
+          sm:max-h-[90vh] sm:rounded-lg ${width}`}
       >
         {children}
       </div>

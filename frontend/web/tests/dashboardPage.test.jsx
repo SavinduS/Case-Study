@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import DashboardPage from '../src/features/collar-alerts/pages/DashboardPage.jsx';
@@ -82,8 +82,13 @@ function hookResult(overrides = {}) {
     activeAlert: ALERT,
     auditTrail: [],
     delayedAlerts: [],
+    dispatchAttempts: [],
     lostCollars: [],
-    sessionExpired: false,
+    bannerAlert: ALERT,
+    announced: [],
+    offline: false,
+    lastUpdatedAt: null,
+    responding: {},
     toast: null,
     visibleZoneIds: ['Z1'],
     acknowledgeAndDispatch: vi.fn(),
@@ -97,10 +102,18 @@ function hookResult(overrides = {}) {
     simulateSignalLost: vi.fn(),
     dismissToast: vi.fn(),
     dismissSignalLost: vi.fn(),
-    setSessionExpired: vi.fn(),
+    silenceAlert: vi.fn(),
+    unsilenceAlert: vi.fn(),
+    loadDispatchAttempts: vi.fn().mockResolvedValue([]),
+    pushFix: vi.fn(),
     ...overrides
   };
 }
+
+// The rail is mirrored by a compact switcher on narrow screens, so tests that
+// mean "the rail" scope to the aside rather than matching a button name globally.
+const railButton = (name) =>
+  within(screen.getByRole('complementary', { name: 'Modules' })).getByRole('button', { name });
 
 const renderPage = () => render(<MemoryRouter><DashboardPage /></MemoryRouter>);
 
@@ -135,10 +148,14 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('heading', { name: /Boundary Breach Detected/ })).not.toBeInTheDocument();
   });
 
-  it('surfaces an API failure with a retry instead of a blank map', async () => {
+  it('surfaces an unreachable API with a retry instead of a blank map', async () => {
     const user = userEvent.setup();
     const refresh = vi.fn();
-    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ error: 'Cannot reach the API. Is the backend running?', refresh }));
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({
+      error: 'Cannot reach the API. Is the backend running?',
+      offline: true,
+      refresh
+    }));
     renderPage();
 
     expect(screen.getByText('Cannot reach the API')).toBeInTheDocument();
@@ -146,31 +163,67 @@ describe('DashboardPage', () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  it('says a server error is not the same as being offline, and dates the data', async () => {
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({
+      error: 'Request failed (500)',
+      offline: false,
+      lastUpdatedAt: '2026-10-09T14:38:00Z'
+    }));
+    renderPage();
+
+    expect(screen.getByText('The API returned an error')).toBeInTheDocument();
+    expect(screen.getByText(/last successful refresh/i)).toBeInTheDocument();
+  });
+
   it('opens the collar registry from the module rail', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Tracked collars' }));
+    await user.click(railButton('Tracked collars'));
     expect(screen.getByRole('region', { name: 'Tracked collars' })).toBeInTheDocument();
   });
 
   it('opens the geofence register from the module rail', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Geofences' }));
+    await user.click(railButton('Geofences'));
     expect(screen.getByRole('region', { name: 'Geofences' })).toBeInTheDocument();
   });
 
   it('hides the queue when another module is open', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Tracked collars' }));
+    await user.click(railButton('Tracked collars'));
     expect(screen.queryByRole('region', { name: 'Active alerts queue' })).not.toBeInTheDocument();
+  });
+
+  it('offers the owned modules in the compact switcher used on phones', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const switcher = screen.getByRole('navigation', { name: 'Modules (compact)' });
+    const names = within(switcher)
+      .getAllByRole('button')
+      .map((b) => b.textContent.trim());
+    // Only the modules this use case owns; other members' modules stay in the rail,
+    // and the reports link is not a panel so it is not mirrored here.
+    expect(names).toEqual(['Tracked collars', 'Active alerts', 'Geofences']);
+  });
+
+  it('switches module from the compact switcher', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const switcher = screen.getByRole('navigation', { name: 'Modules (compact)' });
+    await user.click(within(switcher).getByRole('button', { name: 'Geofences' }));
+    expect(screen.getByRole('region', { name: 'Geofences' })).toBeInTheDocument();
+    expect(within(switcher).getByRole('button', { name: 'Geofences' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('shows another member’s module as a placeholder, not a dead panel', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Field incidents' }));
+    await user.click(railButton('Field incidents'));
     expect(screen.getByRole('heading', { name: 'Field incidents' })).toBeInTheDocument();
     expect(screen.getByText(/Mandinu R P S/)).toBeInTheDocument();
   });
@@ -181,7 +234,7 @@ describe('DashboardPage', () => {
     vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ setZoneEnabled, activeAlert: null }));
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Geofences' }));
+    await user.click(railButton('Geofences'));
     await user.click(screen.getAllByRole('checkbox')[0]);
     // The zone is currently enabled, so the officer is turning it off.
     expect(setZoneEnabled).toHaveBeenCalledWith('Z1', false);
@@ -209,10 +262,35 @@ describe('DashboardPage', () => {
     expect(simulateSignalLost).toHaveBeenCalled();
   });
 
-  it('shows the session expired overlay when the hook says so', () => {
-    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ sessionExpired: true }));
+  it('keeps a critical alert banner on screen alongside the modal', async () => {
+    const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Session expired' })).toBeInTheDocument();
+
+    // The modal can be closed and the alarm muted, but the breach is still
+    // open, so the red strip stays with the reference the officer must act on.
+    expect(screen.getByTestId('critical-alert-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Critical boundary breach — asset E-402/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
+  });
+
+  it('silences the banner through the hook without touching the alert', async () => {
+    const user = userEvent.setup();
+    const silenceAlert = vi.fn();
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ silenceAlert }));
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Silence this alert notification' }));
+    expect(silenceAlert).toHaveBeenCalledWith('CBA-2026-0001');
+    // The incident itself is untouched: the queue still shows it.
+    expect(screen.getByRole('region', { name: 'Active alerts queue' })).toBeInTheDocument();
+  });
+
+  it('hides the banner once every open alert has been silenced', () => {
+    vi.mocked(useCollarAlerts).mockReturnValue(hookResult({ bannerAlert: null, activeAlert: null }));
+    renderPage();
+    expect(screen.queryByTestId('critical-alert-banner')).not.toBeInTheDocument();
   });
 
   it('toggles the operations records drawer from the demo strip', async () => {

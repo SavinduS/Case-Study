@@ -1,280 +1,355 @@
-import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
-  ApiError,
-  createReport,
-  getReport,
-  NetworkError,
-  pingServer,
-  uploadPhoto
-} from './src/api/client';
-import TabBar from './src/components/TabBar';
+  SafeAreaProvider,
+  useSafeAreaInsets
+} from 'react-native-safe-area-context';
+import { fetchMe, login as apiLogin, NetworkError, registerVillager } from './src/api/client';
+import { destinationForRole } from './src/auth/roles';
+import { clearSession, loadSession, saveSession } from './src/auth/session';
+import type { AuthSession } from './src/auth/types';
+import TabBar, { RANGER_TABS } from './src/components/TabBar';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
-import MyReportsScreen from './src/screens/MyReportsScreen';
-import ReportPendingScreen from './src/screens/ReportPendingScreen';
-import ReportSuccessScreen from './src/screens/ReportSuccessScreen';
-import SmsGuideScreen from './src/screens/SmsGuideScreen';
-import SubmitReportScreen, { SubmitData } from './src/screens/SubmitReportScreen';
-import {
-  getCurrentFix,
-  GpsState,
-  requestLocationPermission
-} from './src/services/location';
-import { enqueue, flushQueue, recordOnlineSuccess } from './src/services/offlineQueue';
-import { colors } from './src/theme';
-import type { ConflictReportConfirmation } from './src/types';
+import LoginScreen from './src/screens/LoginScreen';
+import MyIncidentsScreen, { StoredFieldIncident } from './src/screens/MyIncidentsScreen';
+import NewFieldIncidentScreen from './src/screens/NewFieldIncidentScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import ReviewIncidentScreen from './src/screens/ReviewIncidentScreen';
+import SubmitResultScreen from './src/screens/SubmitResultScreen';
+import VillagerShell from './src/screens/VillagerShell';
+import WebDashboardScreen from './src/screens/WebDashboardScreen';
+import type { FieldIncidentDraft } from './src/fieldIncidentTypes';
+import type { GpsFix } from './src/services/location';
+import { colors, font, spacing } from './src/theme';
+import type { ValidatedFieldIncident } from './src/fieldIncidentTypes';
 
-type AppView = 'form' | 'success' | 'pickLocation' | 'pending' | 'myReports' | 'smsGuide';
+// Log Field Incident Offline flow only:
+// report (F1) -> review (F2) -> result (F2) -> myIncidents (F3).
+// pickLocation is a modal overlay from report/review when GPS fails.
+// Ranger sign-in lands in this flow; Villager gets the conflict-report flow
+// (VillagerShell) and Manager/Officer are handed to the web dashboard.
+type AppView = 'report' | 'review' | 'result' | 'myIncidents' | 'pickLocation';
 
-const INITIAL_GPS: GpsState = { status: 'detecting', fix: null, manual: false };
+// Startup: the stored session is revalidated against the server before the
+// app trusts the role inside it.
+type BootState = 'checking' | 'signedOut' | 'signedIn';
+
+function seedInitialIncidents(): StoredFieldIncident[] {
+  const now = Date.now();
+  return [
+    {
+      id: 'pending-1',
+      status: 'pending',
+      incident: {
+        capturedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        incidentType: 'elephant',
+        description: 'Elephant herd near the north boundary fence.',
+        location: { coordinates: [81.41, 6.47], manual: false },
+        photoUri: null
+      }
+    },
+    {
+      id: 'synced-1',
+      status: 'synced',
+      incident: {
+        capturedAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+        incidentType: 'snare',
+        description: 'Snare wire found on the patrol trail.',
+        location: { coordinates: [81.38, 6.5], manual: true },
+        photoUri: null
+      }
+    }
+  ];
+}
 
 export default function App() {
-  const [view, setViewState] = useState<AppView>('form');
-  const viewRef = useRef<AppView>('form');
-  const setView = useCallback((next: AppView) => {
-    viewRef.current = next;
-    setViewState(next);
-  }, []);
-  const [gps, setGps] = useState<GpsState>(INITIAL_GPS);
-  const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | null>(null);
-  const [confirmation, setConfirmation] = useState<ConflictReportConfirmation | null>(null);
-  const [formKey, setFormKey] = useState(0);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [pendingLocalRef, setPendingLocalRef] = useState<string | null>(null);
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
 
-  const pendingRef = useRef<string | null>(null);
-  const flushingRef = useRef(false);
-
-  function setPendingRef(ref: string | null) {
-    pendingRef.current = ref;
-    setPendingLocalRef(ref);
-  }
-
-  const detectLocation = useCallback(async () => {
-    setGps({ status: 'detecting', fix: null, manual: false });
-    const granted = await requestLocationPermission();
-    if (!granted) {
-      setGps({
-        status: 'error',
-        fix: null,
-        manual: false,
-        error: 'Location permission was denied. Set the incident location on the map.'
-      });
-      return;
-    }
-    try {
-      const fix = await getCurrentFix();
-      setGps({ status: 'located', fix, manual: false });
-    } catch {
-      setGps({
-        status: 'error',
-        fix: null,
-        manual: false,
-        error: 'GPS could not determine your position. Set the location on the map.'
-      });
-    }
-  }, []);
-
-  // FR-14: flush locally saved reports on launch and whenever connectivity returns
-  const flushSavedReports = useCallback(async () => {
-    if (flushingRef.current) return;
-    flushingRef.current = true;
-    try {
-      const result = await flushQueue();
-      const ref = pendingRef.current;
-      if (!ref) return;
-      const item = result.synced.find((i) => i.clientRefId === ref);
-      if (!item?.reportId) return;
-      // Only the pending screen auto-replaces itself with the confirmation
-      if (viewRef.current !== 'pending') return;
-
-      let confirmationData: ConflictReportConfirmation;
-      try {
-        confirmationData = await getReport(item.reportId);
-      } catch {
-        confirmationData = {
-          reportId: item.reportId,
-          status: 'RECEIVED',
-          submissionMethod: 'app',
-          incidentType: item.payload.incidentType,
-          locationText: item.payload.locationText,
-          createdAt: item.createdAt
-        };
-      }
-      setPendingRef(null);
-      setConfirmation(confirmationData);
-      setView('success');
-    } finally {
-      flushingRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    detectLocation();
-    void flushSavedReports();
-    void pingServer(); // warm up base-URL discovery in the background
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      const online = state.isConnected !== false && state.isInternetReachable !== false;
-      if (online) void flushSavedReports();
-    });
-    return unsubscribe;
-  }, [detectLocation, flushSavedReports]);
-
-  // The reconnect event can fire before the network actually works — keep
-  // retrying while the app is open so pending rows never wait for a manual tap
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void flushSavedReports();
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [flushSavedReports]);
-
-  // FR-13: server unreachable → keep the report on the device
-  async function saveOffline(data: SubmitData, uploadedPhotoUrl?: string) {
-    try {
-      const entry = await enqueue(
-        { ...data, ...(uploadedPhotoUrl ? { photoUrl: uploadedPhotoUrl } : {}) },
-        uploadedPhotoUrl ? undefined : (photoUri ?? undefined)
-      );
-      setPendingRef(entry.clientRefId);
-      setView('pending');
-    } catch {
-      setServerError('Could not save the report on this device. Free some storage and try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleSubmit(data: SubmitData) {
-    setSubmitting(true);
-    setServerError(null);
-    setFieldErrors(null);
-    setPhotoError(null);
-
-    let photoUrl: string | undefined;
-    if (photoUri) {
-      try {
-        photoUrl = await uploadPhoto(photoUri);
-      } catch (e) {
-        if (e instanceof ApiError) {
-          // E5: villager informed, can retry or remove the photo and submit without it
-          setPhotoError(
-            `Photo could not be uploaded: ${e.message}. Try again, or remove the photo to submit without it.`
-          );
-          setSubmitting(false);
-          return;
+// One place for the notches, so every signed-in screen starts at the same edge.
+function SafeFrame({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        styles.safe,
+        {
+          paddingTop: insets.top,
+          paddingLeft: insets.left,
+          paddingRight: insets.right
         }
-        if (e instanceof NetworkError) {
-          await saveOffline(data);
-          return;
-        }
-        setPhotoError('Photo could not be uploaded. Try again, or remove the photo.');
-        setSubmitting(false);
+      ]}
+    >
+      <StatusBar style="dark" />
+      {children}
+    </View>
+  );
+}
+
+function AppContent() {
+  const [boot, setBoot] = useState<BootState>('checking');
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'register'>('login');
+
+  // Restore the previous session. An expired token or a removed account drops
+  // back to the login screen instead of opening a UI the user may not have
+  // access to any more. A network failure keeps the stored session: the user
+  // stays signed in and the app degrades to offline behaviour.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await loadSession();
+      if (cancelled) return;
+      if (!stored) {
+        setBoot('signedOut');
         return;
       }
-    }
-
-    try {
-      const result = await createReport({ ...data, photoUrl });
-      const storedPayload = { ...data, ...(photoUrl ? { photoUrl } : {}) };
       try {
-        await recordOnlineSuccess(result, storedPayload);
-      } catch {
-        // local history is best-effort; the confirmation screen still shows the id
-      }
-      setConfirmation(result);
-      setSubmitting(false);
-      setView('success');
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const errors = (e.payload.errors ?? null) as Record<string, string> | null;
-        if (e.status === 400 && errors) {
-          setFieldErrors(errors);
-        } else {
-          setServerError(e.message);
+        const user = await fetchMe(stored.token);
+        if (cancelled) return;
+        const refreshed: AuthSession = {
+          ...stored,
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          phone: user.phone,
+          email: user.email
+        };
+        await saveSession(refreshed);
+        setSession(refreshed);
+        setBoot('signedIn');
+      } catch (e) {
+        if (cancelled) return;
+        if (e instanceof NetworkError) {
+          setSession(stored);
+          setBoot('signedIn');
+          return;
         }
-        setSubmitting(false);
-      } else if (e instanceof NetworkError) {
-        // E3: server unreachable → queue locally, inform that it has not arrived yet
-        await saveOffline(data, photoUrl);
-      } else {
-        setServerError('Something went wrong. Please try again.');
-        setSubmitting(false);
+        // ApiError(401) and anything unexpected: the token cannot be trusted.
+        await clearSession();
+        setBoot('signedOut');
       }
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLogin = useCallback(async (identifier: string, password: string) => {
+    const user = await apiLogin(identifier, password);
+    await saveSession(user);
+    setSession(user);
+    setBoot('signedIn');
+    return user;
+  }, []);
+
+  // Villager self sign-up: the server always creates a villager, so the
+  // response goes through the same save-and-route path as signing in.
+  const handleRegister = useCallback(
+    async (input: { name: string; phone: string; password: string; email?: string }) => {
+      const user = await registerVillager(input);
+      await saveSession(user);
+      setSession(user);
+      setBoot('signedIn');
+      return user;
+    },
+    []
+  );
+
+  const handleSignOut = useCallback(async () => {
+    await clearSession();
+    setSession(null);
+    setBoot('signedOut');
+  }, []);
+
+  if (boot === 'checking') {
+    return (
+      <View style={styles.boot}>
+        <StatusBar style="dark" />
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text style={styles.bootText}>Checking your sign-in…</Text>
+      </View>
+    );
   }
 
-  function handleDone() {
-    setConfirmation(null);
-    setFieldErrors(null);
-    setServerError(null);
-    setPhotoUri(null);
-    setPhotoError(null);
-    setPendingRef(null);
-    setFormKey((k) => k + 1);
-    setView('form');
+  if (boot === 'signedOut' || !session) {
+    return (
+      <SafeFrame>
+        {authView === 'register' ? (
+          <RegisterScreen
+            onSubmit={handleRegister}
+            onBackToSignIn={() => setAuthView('login')}
+          />
+        ) : (
+          <LoginScreen
+            onSubmit={handleLogin}
+            onRegister={() => setAuthView('register')}
+          />
+        )}
+      </SafeFrame>
+    );
   }
 
-  function handlePhotoChange(uri: string | null) {
-    setPhotoUri(uri);
-    setPhotoError(null);
+  // Manager and Officer work from the Operations Dashboard; Villager and
+  // Ranger stay in the field app.
+  if (destinationForRole(session.role) === 'webDashboard') {
+    return (
+      <SafeFrame>
+        <WebDashboardScreen session={session} onSignOut={() => void handleSignOut()} />
+      </SafeFrame>
+    );
   }
 
-  function openLocationPicker() {
-    setView('pickLocation');
-  }
-
-  function handleLocationPicked(fix: { coordinates: [number, number]; accuracyMeters?: number }) {
-    setGps({ status: 'located', fix, manual: true });
-    setView('form');
+  if (session.role === 'villager') {
+    return (
+      <SafeFrame>
+        <VillagerShell user={session} onSignOut={() => void handleSignOut()} />
+      </SafeFrame>
+    );
   }
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.safe}>
-        <StatusBar style="dark" />
-        <View style={styles.content}>
-          {view === 'success' && confirmation ? (
-            <ReportSuccessScreen confirmation={confirmation} onDone={handleDone} />
-          ) : view === 'pending' && pendingLocalRef ? (
-            <ReportPendingScreen localRef={pendingLocalRef} onDone={handleDone} />
-          ) : view === 'pickLocation' ? (
-            <LocationPickerScreen
-              initialFix={gps.fix}
-              initialManual={gps.manual}
-              onConfirm={handleLocationPicked}
-              onCancel={() => setView('form')}
-            />
-          ) : view === 'myReports' ? (
-            <MyReportsScreen onRefreshReports={flushSavedReports} />
-          ) : view === 'smsGuide' ? (
-            <SmsGuideScreen />
-          ) : (
-            <SubmitReportScreen
-              key={formKey}
-              gps={gps}
-              submitting={submitting}
-              serverError={serverError}
-              fieldErrors={fieldErrors}
-              photoUri={photoUri}
-              photoError={photoError}
-              onSubmit={handleSubmit}
-              onOpenPicker={openLocationPicker}
-              onPhotoChange={handlePhotoChange}
-            />
-          )}
-        </View>
-        {view === 'success' || view === 'pending' || view === 'pickLocation' ? null : (
-          <TabBar active={view} onSelect={setView} />
-        )}
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <SafeFrame>
+      <RangerShell onSignOut={() => void handleSignOut()} />
+    </SafeFrame>
+  );
+}
+
+// Ranger home after sign-in: the offline field-incident flow.
+function RangerShell({ onSignOut }: { onSignOut: () => void }) {
+  const [view, setView] = useState<AppView>('report');
+  const [manualFix, setManualFix] = useState<GpsFix | null>(null);
+  const [reviewed, setReviewed] = useState<ValidatedFieldIncident | null>(null);
+  const [lastResult, setLastResult] = useState<StoredFieldIncident | null>(null);
+  const [saved, setSaved] = useState<StoredFieldIncident[]>(seedInitialIncidents);
+  const [syncing, setSyncing] = useState(false);
+  const [pickReturnTo, setPickReturnTo] = useState<AppView>('report');
+  // Bump to remount the form so "Edit Report" restores values cleanly.
+  const [formKey, setFormKey] = useState(0);
+  const [editDraft, setEditDraft] = useState<Partial<FieldIncidentDraft> | undefined>(
+    undefined
+  );
+
+  function openPicker(from: AppView) {
+    setPickReturnTo(from);
+    setView('pickLocation');
+  }
+
+  // F1 -> F2: Review Incident button passes validated form data.
+  function handleReview(incident: ValidatedFieldIncident) {
+    setReviewed(incident);
+    setView('review');
+  }
+
+  // F2 -> F1: Edit Report navigates back with current values preserved.
+  function handleEdit() {
+    if (reviewed) {
+      setEditDraft({
+        capturedAt: reviewed.capturedAt,
+        incidentType: reviewed.incidentType,
+        description: reviewed.description,
+        photoUri: reviewed.photoUri
+      });
+      setManualFix({ coordinates: reviewed.location.coordinates });
+      setFormKey((k) => k + 1);
+    }
+    setView('report');
+  }
+
+  // F2 -> F2 result: Submit Report saves offline and shows confirmation.
+  function handleSubmit() {
+    if (!reviewed) return;
+    const entry: StoredFieldIncident = {
+      id: `local-${Date.now()}`,
+      incident: reviewed,
+      status: 'pending'
+    };
+    setSaved((prev) => [entry, ...prev]);
+    setLastResult(entry);
+    setView('result');
+  }
+
+  function handleNewReport() {
+    setReviewed(null);
+    setLastResult(null);
+    setEditDraft(undefined);
+    setManualFix(null);
+    setFormKey((k) => k + 1);
+    setView('report');
+  }
+
+  // F3 sync: flip all pending -> synchronized after a short delay.
+  function handleSyncNow() {
+    if (syncing) return;
+    setSyncing(true);
+    setTimeout(() => {
+      setSaved((prev) => prev.map((item) => ({ ...item, status: 'synced' as const })));
+      setSyncing(false);
+    }, 1200);
+  }
+
+  function handleTabSelect(tabId: string) {
+    if (tabId === 'report') setView('report');
+    else if (tabId === 'myIncidents') setView('myIncidents');
+  }
+
+  const tabActive = view === 'myIncidents' ? 'myIncidents' : 'report';
+
+  return (
+    <View style={styles.content}>
+      {view === 'pickLocation' ? (
+        <LocationPickerScreen
+          initialFix={manualFix}
+          initialManual={manualFix !== null}
+          onConfirm={(fix) => {
+            setManualFix(fix);
+            setView(pickReturnTo === 'pickLocation' ? 'report' : pickReturnTo);
+          }}
+          onCancel={() => setView(pickReturnTo === 'pickLocation' ? 'report' : pickReturnTo)}
+        />
+      ) : view === 'review' && reviewed ? (
+        <ReviewIncidentScreen
+          incident={reviewed}
+          onEdit={handleEdit}
+          onSubmit={handleSubmit}
+          onChangeLocation={() => openPicker('review')}
+        />
+      ) : view === 'result' && lastResult ? (
+        <SubmitResultScreen
+          incident={lastResult.incident}
+          onGoToMyIncidents={() => setView('myIncidents')}
+          onNewReport={handleNewReport}
+        />
+      ) : view === 'myIncidents' ? (
+        <MyIncidentsScreen
+          incidents={saved}
+          syncing={syncing}
+          onSyncNow={handleSyncNow}
+          onNewReport={handleNewReport}
+        />
+      ) : (
+        <NewFieldIncidentScreen
+          key={formKey}
+          initialDraft={editDraft}
+          manualFix={manualFix}
+          onReview={handleReview}
+          onOpenManualLocation={() => openPicker('report')}
+        />
+      )}
+      {view === 'pickLocation' ? null : (
+        <TabBar
+          tabs={RANGER_TABS}
+          active={tabActive}
+          onSelect={handleTabSelect}
+          onSignOut={onSignOut}
+        />
+      )}
+    </View>
   );
 }
 
@@ -284,6 +359,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg
   },
   content: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.bg
+  },
+  boot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    gap: spacing.md
+  },
+  bootText: {
+    color: colors.textMuted,
+    fontSize: font.body
   }
 });

@@ -9,15 +9,18 @@ import {
   View
 } from 'react-native';
 import { ApiError, getReport, pingServer } from '../api/client';
-import { INCIDENT_LABELS } from '../constants/incidentTypes';
+import { INCIDENT_ICONS, INCIDENT_LABELS } from '../constants/incidentTypes';
 import { listReports } from '../services/offlineQueue';
+import { relativeTime } from '../utils/time';
 import StatusBanner from '../components/StatusBanner';
 import ScreenHeader from '../components/ScreenHeader';
+import SignOutButton from '../components/SignOutButton';
 import { colors, font, radius, spacing } from '../theme';
 import type { QueuedReport } from '../types';
 
 interface Props {
   onRefreshReports: () => Promise<void>;
+  onSignOut?: () => void;
 }
 
 type ServerState = 'checking' | 'up' | 'down';
@@ -32,11 +35,7 @@ type LiveState =
   | { state: 'missing' }
   | { state: 'error' };
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
-export default function MyReportsScreen({ onRefreshReports }: Props) {
+export default function MyReportsScreen({ onRefreshReports, onSignOut }: Props) {
   const [entries, setEntries] = useState<QueuedReport[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -102,13 +101,15 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
     const pending = item.status === 'PENDING_UPLOAD';
     const label =
       INCIDENT_LABELS[item.payload.incidentType] ?? item.payload.incidentType;
-    const meta = [item.payload.locationText, formatDateTime(item.createdAt)]
+    const icon = INCIDENT_ICONS[item.payload.incidentType] ?? '❗';
+    const meta = [item.payload.locationText, relativeTime(item.createdAt)]
       .filter(Boolean)
       .join('  ·  ');
 
     return (
       <View style={styles.row}>
         <View style={styles.rowHeader}>
+          <Text style={styles.typeIcon}>{icon}</Text>
           <Text style={styles.type}>{label}</Text>
           <View style={[styles.badge, pending ? styles.badgePending : styles.badgeReceived]}>
             <Text style={pending ? styles.badgePendingText : styles.badgeReceivedText}>
@@ -148,21 +149,24 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
     );
   }
 
-  const refreshButton = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Refresh reports"
-      onPress={handleRefresh}
-      disabled={refreshing}
-      style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-    >
-      <Text style={styles.headerLink}>{refreshing ? '…' : 'Refresh'}</Text>
-    </Pressable>
-  );
+  const pendingCount = entries.filter(
+    (e) => e.status === 'PENDING_UPLOAD'
+  ).length;
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="My Reports" right={refreshButton} />
+      <ScreenHeader
+        title="My Reports"
+        right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
+      />
+
+      {pendingCount > 0 ? (
+        <View style={styles.summaryWrap}>
+          <Text style={styles.summaryText}>
+            {pendingCount} report{pendingCount === 1 ? '' : 's'} waiting to upload
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.bannerWrap}>
         {server.state === 'checking' ? (
@@ -190,7 +194,12 @@ export default function MyReportsScreen({ onRefreshReports }: Props) {
           loadingList ? (
             <ActivityIndicator style={styles.emptySpinner} color={colors.primary} />
           ) : (
-            <Text style={styles.empty}>No reports submitted from this device yet.</Text>
+            <View>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.empty}>
+                Reports you send from this phone will appear here.
+              </Text>
+            </View>
           )
         }
       />
@@ -203,14 +212,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg
   },
-  headerButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm
+  summaryWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md
   },
-  headerLink: {
-    color: colors.primary,
-    fontSize: font.body,
+  summaryText: {
+    color: colors.offlineText,
+    fontSize: font.small,
     fontWeight: '600'
   },
   bannerWrap: {
@@ -233,6 +241,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.sm
+  },
+  typeIcon: {
+    fontSize: font.section,
+    marginRight: spacing.xs
   },
   type: {
     flex: 1,
@@ -316,11 +328,16 @@ const styles = StyleSheet.create({
     fontSize: font.small,
     fontWeight: '700'
   },
+  emptyIcon: {
+    fontSize: 40,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm
+  },
   empty: {
     color: colors.textMuted,
     fontSize: font.body,
-    textAlign: 'center',
-    marginTop: spacing.xl
+    textAlign: 'center'
   },
   emptySpinner: {
     marginTop: spacing.xl

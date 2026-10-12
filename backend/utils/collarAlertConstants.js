@@ -21,6 +21,18 @@ const COLLAR_STATUS = {
   SIGNAL_LOST: 'signal_lost'
 };
 
+/**
+ * Officer responses accepted by POST /api/alerts/:alertId/respond. Kept as the
+ * single source of truth so the controller can reject anything else with a 400
+ * instead of reaching the service.
+ */
+const RESPONSE_ACTION = {
+  ACKNOWLEDGE_DISPATCH: 'acknowledge_dispatch',
+  MONITOR_CLOSELY: 'monitor_closely',
+  MARK_FALSE_ALARM: 'mark_false_alarm',
+  DISPATCH_PATCH_CHECK: 'dispatch_patch_check'
+};
+
 const RANGER_STATUS = {
   AVAILABLE: 'available',
   ON_PATROL: 'on_patrol',
@@ -77,6 +89,7 @@ const PROXIMITY_WEIGHT_PER_KM = 25;
 module.exports = {
   ALERT_STATUS,
   THREAT_LEVEL,
+  RESPONSE_ACTION,
   COLLAR_STATUS,
   RANGER_STATUS,
   DISPATCH_STATE,

@@ -1,4 +1,5 @@
 import { ApiError } from '../../../services/api.js';
+import { readSession } from '../../../services/session.js';
 
 const BASE = '/api';
 const ZONE_LABELS = {
@@ -8,12 +9,17 @@ const ZONE_LABELS = {
   WESTBOUNDARY: 'West Boundary'
 };
 
+function authHeader() {
+  const token = readSession()?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request(path, options = {}) {
   let response;
   try {
     response = await fetch(`${BASE}${path}`, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: { ...authHeader(), 'Content-Type': 'application/json', ...(options.headers || {}) },
       body: options.body && JSON.stringify(options.body)
     });
   } catch {
@@ -115,7 +121,9 @@ export const saveReport = (criteria) => getReport(criteria);
 export async function exportReport(reportId, format) {
   let response;
   try {
-    response = await fetch(`${BASE}/analytics/reports/${encodeURIComponent(reportId)}/export?format=${format}`);
+    response = await fetch(`${BASE}/analytics/reports/${encodeURIComponent(reportId)}/export?format=${format}`, {
+      headers: authHeader()
+    });
   } catch {
     throw new ApiError('Cannot reach the analytics API.', 0);
   }

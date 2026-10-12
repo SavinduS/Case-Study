@@ -7,7 +7,7 @@ import Button from '../../../../components/ui/Button.jsx';
  * is being dismissed, because the note is stored in the audit trail and is
  * the evidence that the breach was collar signal drift.
  */
-export default function FalseAlarmDialog({ open, alert, onCancel, onConfirm }) {
+export default function FalseAlarmDialog({ open, alert, busy = false, onCancel, onConfirm }) {
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -43,11 +43,15 @@ export default function FalseAlarmDialog({ open, alert, onCancel, onConfirm }) {
       </div>
 
       <footer className="flex justify-end gap-3 border-t border-stone-200 bg-stone-50 px-6 py-4">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={notes.trim().length === 0} onClick={() => onConfirm(notes.trim())}>
-          Confirm false alarm
+        <Button
+          variant="primary"
+          disabled={busy || notes.trim().length === 0}
+          onClick={() => onConfirm(notes.trim())}
+        >
+          {busy ? 'Saving…' : 'Confirm false alarm'}
         </Button>
       </footer>
     </Modal>

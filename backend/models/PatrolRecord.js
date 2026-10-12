@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+/**
+ * A GeoJSON Point for an optional location.
+ *
+ * Declared as a real sub-document with `default: undefined` rather than the
+ * usual nested `{ type: { type: String }, coordinates: [Number] }`: the latter
+ * makes Mongoose materialise `{ type: 'Point' }` with no coordinates even when
+ * the caller supplies no location at all, and the 2dsphere index then rejects
+ * the insert ("Point must be an array or object, instead got type missing").
+ */
+const pointSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['Point'] },
+    coordinates: [Number] // [lng, lat]
+  },
+  { _id: false }
+);
+
+// A patrol log from the ranger app often records only a sector and a date.
 const patrolRecordSchema = new mongoose.Schema({
   ranger: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   sectorCode: String,
@@ -11,7 +29,7 @@ const patrolRecordSchema = new mongoose.Schema({
   endedAt: Date,
   hours: Number,
   durationHours: Number,
-  location: { type: { type: String, enum: ['Point'], default: 'Point' }, coordinates: [Number] },
+  location: { type: pointSchema, default: undefined },
   notes: String
 }, { timestamps: true, collection: 'patrols' });
 

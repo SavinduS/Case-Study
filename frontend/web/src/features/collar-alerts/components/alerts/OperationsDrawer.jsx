@@ -7,8 +7,20 @@ import { ALERT_STATUS, AUDIT_TAB, formatGmtStamp } from '../../domain/labels.js'
  * OperationsDrawer — the review surface for the two record-keeping parts of
  * the use case: retroactive "Delayed Incident" breaches (alternate flow D)
  * and the wildlife monitoring audit trail (main flow step 12).
+ *
+ * The third tab is the ranger dispatch log, so a requested dispatch, the
+ * attempts that were delivered and the ones that failed are all inspectable
+ * from the same place (exception flow 3).
  */
-export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTrail, onDispatchPatrolCheck, onSelectAlert }) {
+export default function OperationsDrawer({
+  open,
+  onClose,
+  delayedAlerts,
+  auditTrail,
+  dispatchAttempts = [],
+  onDispatchPatrolCheck,
+  onSelectAlert
+}) {
   const [tab, setTab] = useState(AUDIT_TAB.DELAYED);
 
   const delayedCount = useMemo(
@@ -16,12 +28,24 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
     [delayedAlerts]
   );
 
+  const failedDispatches = useMemo(
+    () => dispatchAttempts.filter((attempt) => attempt.state === 'failed'),
+    [dispatchAttempts]
+  );
+
   if (!open) return null;
+
+  const TABS = [
+    { key: AUDIT_TAB.DELAYED, label: 'Delayed incidents', count: delayedCount || null },
+    { key: AUDIT_TAB.DISPATCH, label: 'Dispatch log', count: failedDispatches.length || null },
+    { key: AUDIT_TAB.AUDIT, label: 'Audit trail', count: auditTrail.length || null }
+  ];
 
   return (
     <section
       aria-label="Operations records"
-      className="absolute left-16 top-16 z-[750] w-[26rem] rounded-lg bg-white shadow-2xl ring-1 ring-black/10"
+      className="absolute inset-x-3 top-16 z-[750] max-w-full rounded-lg bg-white shadow-2xl
+        ring-1 ring-black/10 lg:left-16 lg:w-[26rem]"
     >
       <header className="flex items-center gap-2 border-b border-stone-200 px-4 py-2.5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-stone-800">Operations Records</h2>
@@ -38,28 +62,20 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
       </header>
 
       <div role="tablist" aria-label="Records" className="flex gap-1 border-b border-stone-200 px-2">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === AUDIT_TAB.DELAYED}
-          onClick={() => setTab(AUDIT_TAB.DELAYED)}
-          className={`px-3 py-2 text-xs font-bold uppercase tracking-wide ${
-            tab === AUDIT_TAB.DELAYED ? 'border-b-2 border-alert-600 text-alert-600' : 'text-stone-500'
-          }`}
-        >
-          Delayed incidents {delayedCount > 0 && <span className="ml-1">({delayedCount})</span>}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === AUDIT_TAB.AUDIT}
-          onClick={() => setTab(AUDIT_TAB.AUDIT)}
-          className={`px-3 py-2 text-xs font-bold uppercase tracking-wide ${
-            tab === AUDIT_TAB.AUDIT ? 'border-b-2 border-alert-600 text-alert-600' : 'text-stone-500'
-          }`}
-        >
-          Audit trail ({auditTrail.length})
-        </button>
+        {TABS.map(({ key, label, count }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`px-3 py-2 text-xs font-bold uppercase tracking-wide ${
+              tab === key ? 'border-b-2 border-alert-600 text-alert-600' : 'text-stone-500'
+            }`}
+          >
+            {label} {count !== null && <span className="ml-1">({count})</span>}
+          </button>
+        ))}
       </div>
 
       <div className="max-h-72 overflow-y-auto">
@@ -98,6 +114,43 @@ export default function OperationsDrawer({ open, onClose, delayedAlerts, auditTr
                   </div>
                 </li>
               ))}
+            </ul>
+          )
+        ) : tab === AUDIT_TAB.DISPATCH ? (
+          dispatchAttempts.length === 0 ? (
+            <p className="px-4 py-6 text-center text-xs text-stone-500">
+              No ranger dispatch has been made for this session.
+            </p>
+          ) : (
+            <ul>
+              {dispatchAttempts.map((attempt) => (
+                <li
+                  key={attempt._id ?? `${attempt.alertId}-${attempt.attempt}`}
+                  className="border-b border-stone-100 px-4 py-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] font-semibold text-park-800">
+                      {attempt.alertId}
+                    </span>
+                    <Badge tone={attempt.state === 'delivered' ? 'low' : 'high'} size="sm">
+                      {attempt.state === 'delivered' ? 'Delivered' : attempt.state === 'failed' ? 'Failed delivery' : 'Sending'}
+                    </Badge>
+                    <span className="ml-auto font-mono text-[11px] text-stone-500">
+                      attempt {attempt.attempt}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-stone-600">
+                    {attempt.rangerName ?? 'No ranger team selected'}
+                    {attempt.error ? ` — ${attempt.error}` : ''}
+                  </p>
+                </li>
+              ))}
+              {failedDispatches.length > 0 && (
+                <li className="bg-alert-100 px-4 py-2.5 text-xs font-semibold text-alert-600">
+                  {failedDispatches.length} dispatch attempt(s) failed after 3 retries. Contact the ranger team by
+                  radio.
+                </li>
+              )}
             </ul>
           )
         ) : auditTrail.length === 0 ? (
