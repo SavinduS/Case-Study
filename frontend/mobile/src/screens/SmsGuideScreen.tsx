@@ -1,9 +1,22 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import ScreenHeader from "../components/ScreenHeader";
 import SignOutButton from "../components/SignOutButton";
 import { SMS_AREA_CODES, SMS_HOTLINE, SMS_TYPE_CODES } from "../constants/sms";
 import { colors, font, radius, spacing } from "../theme";
+
+const EXAMPLE_SMS = "1 NORTHBOUNDARY";
+const HOTLINE_NUMBER = SMS_HOTLINE.replace(/\s/g, "");
+
+function openHotline() {
+  void Linking.openURL(`tel:${HOTLINE_NUMBER}`).catch(() => {});
+}
+
+function openExampleSms() {
+  const separator = Platform.OS === "ios" ? "&" : "?";
+  const url = `sms:${HOTLINE_NUMBER}${separator}body=${encodeURIComponent(EXAMPLE_SMS)}`;
+  void Linking.openURL(url).catch(() => {});
+}
 
 interface Props {
   onSignOut?: () => void;
@@ -13,7 +26,7 @@ export default function SmsGuideScreen({ onSignOut }: Props) {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="SMS Reporting Guide"
+        title="SMS Guide"
         right={onSignOut ? <SignOutButton onPress={onSignOut} /> : undefined}
       />
 
@@ -25,14 +38,30 @@ export default function SmsGuideScreen({ onSignOut }: Props) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>SMS the wildlife hotline</Text>
           <Text style={styles.hotline}>{SMS_HOTLINE}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Call the wildlife hotline"
+            onPress={openHotline}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.actionText}>📞 Call the hotline</Text>
+          </Pressable>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Message format</Text>
           <Text style={styles.format}>TYPE-CODE AREA-CODE</Text>
           <View style={styles.exampleRow}>
-            <Text style={styles.example}>Example: 1 NORTHBOUNDARY</Text>
+            <Text style={styles.example}>Example: {EXAMPLE_SMS}</Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send the example SMS"
+            onPress={openExampleSms}
+            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.actionText}>💬 Send example SMS</Text>
+          </Pressable>
         </View>
 
         <Text style={styles.sectionTitle}>Type codes</Text>
@@ -105,6 +134,24 @@ const styles = StyleSheet.create({
     fontSize: font.title,
     fontWeight: "800",
     marginTop: spacing.xs,
+  },
+  actionButton: {
+    minHeight: 44,
+    marginTop: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  actionText: {
+    color: colors.primaryDark,
+    fontSize: font.small,
+    fontWeight: "700",
   },
   format: {
     color: colors.text,

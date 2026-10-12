@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { ApiError, createReport, NetworkError } from '../api/client';
 import TabBar, { VILLAGER_TABS } from '../components/TabBar';
 import { enqueue, flushQueue, recordOnlineSuccess } from '../services/offlineQueue';
@@ -65,6 +66,7 @@ export default function VillagerShell({ onSignOut }: Props) {
       setConfirmation(accepted);
       setPhotoUri(null);
       setView('success');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       if (e instanceof NetworkError) {
         // No connection: store on the device and say so in words.

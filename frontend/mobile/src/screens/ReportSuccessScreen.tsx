@@ -1,5 +1,6 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import PrimaryButton from '../components/PrimaryButton';
 import { colors, font, radius, spacing } from '../theme';
 import type { ConflictReportConfirmation } from '../types';
@@ -15,6 +16,19 @@ function formatDateTime(iso: string): string {
 }
 
 export default function ReportSuccessScreen({ confirmation, onDone }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  async function handleCopyId() {
+    await Clipboard.setStringAsync(confirmation.reportId);
+    setCopied(true);
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
@@ -25,7 +39,17 @@ export default function ReportSuccessScreen({ confirmation, onDone }: Props) {
         <Text style={styles.body}>Your conflict report has been successfully received.</Text>
 
         <Text style={styles.fieldLabel}>Report ID</Text>
-        <Text style={styles.reportId}>{confirmation.reportId}</Text>
+        <View style={styles.idRow}>
+          <Text style={styles.reportId}>{confirmation.reportId}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Copy report ID"
+            onPress={handleCopyId}
+            style={({ pressed }) => [styles.copyButton, pressed && styles.copyPressed]}
+          >
+            <Text style={styles.copyText}>{copied ? 'Copied ✓' : 'Copy'}</Text>
+          </Pressable>
+        </View>
 
         <Text style={styles.fieldLabel}>Status</Text>
         <View style={styles.statusRow}>
@@ -107,12 +131,35 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: spacing.sm
   },
+  idRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+    marginTop: 2
+  },
   reportId: {
     color: colors.text,
     fontSize: 26,
     fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 2
+    letterSpacing: 1
+  },
+  copyButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft
+  },
+  copyPressed: {
+    opacity: 0.7
+  },
+  copyText: {
+    color: colors.primaryDark,
+    fontSize: font.small,
+    fontWeight: '700'
   },
   statusRow: {
     flexDirection: 'row',
