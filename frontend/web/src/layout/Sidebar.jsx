@@ -1,3 +1,5 @@
+import { NavLink } from 'react-router-dom';
+
 /**
  * Left icon rail shown behind the map in the storyboard frames.
  *
@@ -6,12 +8,18 @@
  * button. `collars`, `alerts` and `geofences` are driven by the collar
  * boundary alert use case and open real panels.
  *
+ * `reports` carries a `to` instead of being a panel: the analytics reports are
+ * a full workspace with their own shell, so the rail links straight into it
+ * rather than opening an overlay on the map. Everything without `to` is
+ * reported through `onSelect` as a panel key.
+ *
+ * Villager reports are deliberately absent from the rail. They are a
+ * full-screen workspace of their own, reached from the top bar, so putting
+ * them here would offer a map overlay that the officer has to leave to use.
+ *
  * Administration is deliberately absent. User accounts and park configuration
  * are an administrator's job, not part of the Operations Officer's shift, so the
- * rail does not offer a route the officer could not use. Analytics reports are
- * absent for the same reason in the other direction: they are a full workspace
- * with their own shell and top bar, not a panel that belongs on the map, so the
- * top bar's Reports tab is the only place they are offered.
+ * rail does not offer a route the officer could not use.
  */
 export const RAIL = [
   {
@@ -39,19 +47,19 @@ export const RAIL = [
     icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5v5.6l4 2.4-1 1.7-5-3V7h2Z'
   },
   {
-    key: 'patrol',
-    label: 'Patrols',
-    owner: 'Wijesingha S M',
-    icon: 'M4 20l4-1 10-10-3-3L5 16l-1 4Zm13.7-12.3 1.6-1.6a2 2 0 0 0 0-1.4l-2-2a2 2 0 0 0-1.4 0l-1.6 1.6 3.4 3.4Z'
-  },
-  {
-    key: 'cameras',
-    label: 'Camera traps',
-    owner: 'Not in the group design',
-    icon: 'M9 4h6l1.5 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5L9 4Zm3 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z'
+    key: 'reports',
+    label: 'Reports',
+    owner: null,
+    to: '/analytics/type',
+    icon: 'M4 20h3V10H4v10Zm6.5 0h3V4h-3v16ZM17 20h3v-7h-3v7Z'
   }
 ];
 
+/**
+ * Icon rail. Entries that open a panel on the map report their key through
+ * `onSelect`; entries with a `to` are real links and leave the dashboard for
+ * the workspace they belong to.
+ */
 export default function Sidebar({ activeKey, onSelect }) {
   return (
     <aside
@@ -61,6 +69,33 @@ export default function Sidebar({ activeKey, onSelect }) {
     >
       {RAIL.map((item) => {
         const isActive = item.key === activeKey;
+        const className = `grid h-10 w-10 place-items-center rounded-lg transition-colors ${
+          isActive
+            ? 'bg-moss-500 text-white'
+            : item.owner
+              ? 'text-white/40 hover:bg-white/10 hover:text-white/80'
+              : 'hover:bg-white/10 hover:text-white'
+        }`;
+        const icon = (
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d={item.icon} />
+          </svg>
+        );
+
+        if (item.to) {
+          return (
+            <NavLink
+              key={item.key}
+              to={item.to}
+              title={item.label}
+              aria-label={item.label}
+              className={className}
+            >
+              {icon}
+            </NavLink>
+          );
+        }
+
         return (
           <button
             key={item.key}
@@ -69,17 +104,9 @@ export default function Sidebar({ activeKey, onSelect }) {
             title={item.owner ? `${item.label} — ${item.owner}` : item.label}
             aria-label={item.label}
             aria-current={isActive ? 'true' : undefined}
-            className={`grid h-10 w-10 place-items-center rounded-lg transition-colors ${
-              isActive
-                ? 'bg-moss-500 text-white'
-                : item.owner
-                  ? 'text-white/40 hover:bg-white/10 hover:text-white/80'
-                  : 'hover:bg-white/10 hover:text-white'
-            }`}
+            className={className}
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d={item.icon} />
-            </svg>
+            {icon}
           </button>
         );
       })}

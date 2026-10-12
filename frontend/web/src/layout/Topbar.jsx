@@ -5,13 +5,15 @@ import usePortalSession from './usePortalSession.js';
 import { initialsOf, isEmbedded, roleLabel, signOut } from '../services/session.js';
 import Sidebar, { RAIL } from './Sidebar.jsx';
 
-// Operations Officer navigation. Two working destinations and nothing else:
-// the collar alert dashboard and the reports workspace. Data Logs and Map View
-// were placeholders for shared-platform modules, and the map the officer needs
-// is already the full-bleed background of the dashboard — offering it as its
-// own tab only sent people to an empty page.
+// Operations Officer navigation. Three working destinations and nothing else:
+// the collar alert dashboard, the villager reports workspace and the analytics
+// reports workspace. Data Logs and Map View were placeholders for
+// shared-platform modules, and the map the officer needs is already the
+// full-bleed background of the dashboard — offering it as its own tab only sent
+// people to an empty page.
 const NAV = [
   { key: 'dashboard', label: 'Dashboard', to: '/', implemented: true },
+  { key: 'villager-reports', label: 'Villager Reports', to: '/villager-reports', implemented: true },
   { key: 'reports', label: 'Reports', to: '/analytics/type', implemented: true }
 ];
 
@@ -75,15 +77,8 @@ export default function Topbar() {
           </svg>
         </button>
 
-        <span className="whitespace-nowrap px-3 text-[11px] font-extrabold uppercase leading-tight tracking-wide lg:w-56 lg:px-5 lg:text-sm">
-          <span className="lg:hidden">Wildlife Portal</span>
-          <span className="hidden lg:inline">
-            Wildlife
-            <br />
-            Conservation
-            <br />
-            Portal
-          </span>
+        <span className="whitespace-nowrap px-3 text-[11px] font-extrabold uppercase leading-tight tracking-wide lg:px-5 lg:text-sm">
+          Wildlife Conservation Portal
         </span>
       </div>
 
@@ -169,13 +164,9 @@ export default function Topbar() {
             Modules
           </p>
           <ul className="px-2">
-            {RAIL.map((item) => (
-              <li key={item.key}>
-                <span
-                  className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
-                    item.owner ? 'text-white/40' : 'text-white/80'
-                  }`}
-                >
+            {RAIL.map((item) => {
+              const body = (
+                <>
                   <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d={item.icon} />
                   </svg>
@@ -185,9 +176,28 @@ export default function Topbar() {
                       {item.owner}
                     </span>
                   )}
-                </span>
-              </li>
-            ))}
+                </>
+              );
+              const className = `flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
+                item.owner ? 'text-white/40' : 'text-white/80'
+              }`;
+
+              return (
+                <li key={item.key}>
+                  {item.to ? (
+                    <NavLink
+                      to={item.to}
+                      onClick={() => setMenuOpen(false)}
+                      className={className}
+                    >
+                      {body}
+                    </NavLink>
+                  ) : (
+                    <span className={className}>{body}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
