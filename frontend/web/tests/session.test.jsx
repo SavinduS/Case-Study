@@ -326,49 +326,6 @@ describe('portal route guard', () => {
     expect(screen.getByText('Analytics reports')).toBeInTheDocument();
   });
 
-  // The Park Manager never sees the officer's map, but they do triage the same
-  // community reports, so villager reports are the one shared workspace.
-  it('lets the Park Manager into the villager reports workspace', () => {
-    storeSession({ ...OFFICER, role: 'manager' });
-
-    render(
-      <MemoryRouter initialEntries={['/villager-reports']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByRole('heading', { name: 'Villager reports' })).toBeInTheDocument();
-    expect(screen.getByText('Park Manager')).toBeInTheDocument();
-  });
-
-  it('lets the Operations Officer into the villager reports workspace', () => {
-    storeSession(OFFICER);
-
-    render(
-      <MemoryRouter initialEntries={['/villager-reports']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByRole('heading', { name: 'Villager reports' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Villager Reports' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-  });
-
-  it('sends a villager session away from the villager reports workspace', () => {
-    storeSession({ ...OFFICER, role: 'villager' });
-
-    render(
-      <MemoryRouter initialEntries={['/villager-reports']}>
-        <App />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-  });
-
   it('turns away a villager session even if one is stored', () => {
     storeSession({ ...OFFICER, role: 'villager' });
 

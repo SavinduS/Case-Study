@@ -17,13 +17,6 @@ router.post('/generate', controller.generate);
 router.get('/reports', controller.list);
 router.get('/reports/:id/export', controller.exportReport);
 router.get('/reports/:id', controller.get);
-router.get('/zone-settings', controller.getZoneSettings);
-// No-login demo mode may save too (audited as demo-manager); signed-in
-// writers must be Park Managers.
-router.put('/zone-settings', (req, res, next) => {
-  if (!req.user) return next();
-  return requireRole('manager')(req, res, next);
-}, controller.updateZoneSettings);
 router.get('/zones/:code/records', controller.zoneRecords);
 
 module.exports = router;
