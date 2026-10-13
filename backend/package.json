@@ -17,10 +17,6 @@
       "<rootDir>/tests/*.test.js",
       "<rootDir>/tests/analytics/*.test.js",
       "<rootDir>/tests/conflict-report-submit-villager/*.test.js"
-
-      "<rootDir>/tests/*.test.js",
-      "<rootDir>/tests/conflict-report-submit-villager/*.test.js"
-
     ],
     "setupFiles": [
       "<rootDir>/tests/setupEnv.js"

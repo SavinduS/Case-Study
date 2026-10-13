@@ -296,7 +296,6 @@ async function generateAnalytics(rawCriteria, userId) {
   return report;
 }
 
-<<<<<<< Updated upstream
 // The internals are exported so the formulas this module is responsible for
 // can be tested directly instead of only through generateAnalytics, which
 // would need database fixtures for every arithmetic edge case.
@@ -312,8 +311,8 @@ module.exports = {
   direction,
   configuredHours,
   isoWeek,
-  toAnalyticsIncident
+  toAnalyticsIncident,
+  getRequiredHours,
+  mergeRequiredHours,
+  DEFAULT_REQUIRED_HOURS
 };
-=======
-module.exports = { parseCriteria, generateAnalytics, incidentCategories, sectorForIncident, noData, getRequiredHours, mergeRequiredHours, DEFAULT_REQUIRED_HOURS };
->>>>>>> Stashed changes

@@ -3,6 +3,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    // The analytics suites are plain CommonJS (describe/test/expect globals)
+    // so they can run under both Vitest and Jest, as the Jest testMatch does.
+    globals: true,
+    testTimeout: 60000,
     // Every suite in this scope shares one dedicated test database (see
     // tests/helpers/db.js). Running files in parallel would have them truncating
     // each other's collections, so they run sequentially in one process.

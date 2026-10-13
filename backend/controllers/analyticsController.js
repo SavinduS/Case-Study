@@ -31,7 +31,7 @@ async function getZoneSettings(req, res, next) {
     res.json(SECTORS.map((s) => ({
       code: s.code,
       name: s.name,
-      requiredHours: required[s.code] ?? DEFAULT_REQUIRED_HOURS,
+      requiredHours: byCode[s.code] ? Number(byCode[s.code].requiredHours) : (required[s.code] || DEFAULT_REQUIRED_HOURS),
       saved: Boolean(byCode[s.code])
     })));
   } catch (e) { next(e); }
