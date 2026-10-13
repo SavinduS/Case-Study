@@ -19,7 +19,7 @@ const FIELD_INCIDENT_LOCATION_SOURCES = ['gps', 'manual'];
 // Description rule: required, 1-500 characters after trimming.
 const FIELD_INCIDENT_MAX_DESCRIPTION = 500;
 
-// Photo rule: required, JPEG or PNG only, up to 5 MB.
+// Photo rule: optional, JPEG or PNG only when supplied, up to 5 MB.
 // (Deliberately stricter than utils/upload.js, which also accepts WebP.)
 const FIELD_INCIDENT_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const FIELD_INCIDENT_ALLOWED_PHOTO_MIMETYPES = ['image/jpeg', 'image/png'];

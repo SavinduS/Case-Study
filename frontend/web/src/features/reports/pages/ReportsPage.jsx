@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getReport, getSavedReports, getZoneRecords, saveReport, exportReport } from '../services/reportsApi.js';
-import { ZONES, ZONE_LABELS, CATEGORIES, CATEGORY_LABELS, defaultCriteria, loadCriteria, saveCriteria } from '../services/criteria.js';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 
+const ZONES = ['NORTHBOUNDARY', 'EASTBOUNDARY', 'SOUTHBOUNDARY', 'WESTBOUNDARY'];
+const ZONE_LABELS = { NORTHBOUNDARY: 'North Boundary', EASTBOUNDARY: 'East Boundary', SOUTHBOUNDARY: 'South Boundary', WESTBOUNDARY: 'West Boundary' };
+const CATEGORIES = ['elephant', 'crop', 'poacher', 'snare'];
+const CATEGORY_LABELS = { elephant: 'Elephant conflict', crop: 'Crop damage', poacher: 'Poaching', snare: 'Snare / trap' };
 const TYPES = [
   ['incident', 'Incident Summary', 'Incidents by category, location and time'],
   ['patrol', 'Patrol Coverage', 'Coverage, effort and response across zones'],
   ['terrain', 'Terrain Trend', 'Terrain hotspots and changes over time'],
 ];
+const initialCriteria = { reportType: 'incident', startDate: '2026-01-01', endDate: '2026-10-09', zones: ZONES, categories: CATEGORIES, baseline: 'previous-period' };
 const REPORT_NAMES = { incident: 'Incident summary report', patrol: 'Patrol coverage report', terrain: 'Terrain trend report', incidentSummary: 'Incident summary report', patrolCoverage: 'Patrol coverage report', terrainTrend: 'Terrain trend report' };
 function reportName(report) {
   if (report.name || report.title) return report.name || report.title;
@@ -19,8 +23,7 @@ function reportName(report) {
 }
 
 export default function ReportsPage() {
-  const initial = useMemo(() => loadCriteria() ?? defaultCriteria(), []);
-  const [criteria, setCriteria] = useState(initial);
+  const [criteria, setCriteria] = useState(initialCriteria);
   const [result, setResult] = useState(null);
   const [saved, setSaved] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,7 +37,7 @@ export default function ReportsPage() {
     setLoading(true);
     Promise.all([
       getSavedReports().catch(() => []),
-      getReport(initial)
+      getReport(initialCriteria)
     ])
       .then(([reports, report]) => {
         if (!active) return;
@@ -58,11 +61,11 @@ export default function ReportsPage() {
   async function runReport(event) {
     event.preventDefault(); setLoading(true); setError(''); setNotice('');
     if (!criteria.zones.length) { setError('Select at least one terrain zone before generating a report.'); setLoading(false); return; }
-    try { saveCriteria(criteria); setResult(await getReport(criteria)); } catch (e) { setError(e.message); setResult(null); } finally { setLoading(false); }
+    try { setResult(await getReport(criteria)); } catch (e) { setError(e.message); setResult(null); } finally { setLoading(false); }
   }
   async function handleSave() {
     if (!criteria.zones.length) { setError('Select at least one terrain zone before saving a report.'); return; }
-    try { saveCriteria(criteria); const item = await saveReport(criteria); setResult(item); setSaved((items) => [item, ...items]); setNotice('Report generated and saved.'); } catch (e) { setNotice(e.message); }
+    try { const item = await saveReport(criteria); setResult(item); setSaved((items) => [item, ...items]); setNotice('Report generated and saved.'); } catch (e) { setNotice(e.message); }
   }
   async function handleExport(format) {
     try {
@@ -116,7 +119,7 @@ function Dashboard({ data, maxTrend, onZone }) {
   return <div className="space-y-5">
     {data.status === 'partial' && <div role="status" className="rounded-lg border border-gold-500/40 bg-gold-100 px-4 py-3 text-sm text-park-800"><strong>Partial report:</strong> Some source data is unavailable. {(data.partialReasons || []).join(' ')}</div>}
     <div className="rounded-xl border border-moss-500/30 bg-park-50 px-4 py-3 text-sm text-park-800"><strong>{type === 'patrol' ? 'Patrol Coverage' : type === 'terrain' ? 'Terrain Trend' : 'Incident Summary'}</strong> · Live data for the selected period. Trend direction: <span className="font-bold">{direction}</span></div>
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[['Incidents recorded', k.incidents, 'Selected period', 'text-alert-600'], ['Patrol coverage', k.patrolCoverage == null ? 'N/A' : `${k.patrolCoverage}%`, k.patrolCoverage == null ? 'Required hours not configured' : 'Against required hours', 'text-moss-500'], ['Hotspot zones', k.hotspots, 'Needs attention', 'text-gold-500'], ['Avg. response', k.responseTime == null ? '0' : `${k.responseTime} min`, 'No response records yet', 'text-park-800']].map(([label, value, sub, tone]) => <div key={label} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-stone-500">{label}</p><p className={`mt-2 text-2xl font-extrabold ${tone}`}>{value}</p><p className="mt-1 text-xs text-stone-500">{sub}</p></div>)}</div>
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[['Incidents recorded', k.incidents, 'Selected period', 'text-alert-600'], ['Patrol coverage', `${k.patrolCoverage}%`, 'Against required hours', 'text-moss-500'], ['Hotspot zones', k.hotspots, 'Needs attention', 'text-gold-500'], ['Avg. response', k.responseTime == null ? 'N/A' : `${k.responseTime} min`, 'Not available in source data', 'text-park-800']].map(([label, value, sub, tone]) => <div key={label} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-stone-500">{label}</p><p className={`mt-2 text-2xl font-extrabold ${tone}`}>{value}</p><p className="mt-1 text-xs text-stone-500">{sub}</p></div>)}</div>
     <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]"><Panel title={type === 'terrain' ? 'Terrain trend' : 'Incident trend'} subtitle="Live activity in selected period"><TrendChart trend={trend} maxTrend={maxTrend} /></Panel><Panel title="Patrol coverage" subtitle="Share of zone requiring patrol"><div className="space-y-4">{coverage.map((item) => <div key={item.code}><div className="mb-1 flex justify-between text-xs"><span>{item.name}</span><strong>{item.value == null ? 'N/A' : `${item.value}%`}</strong></div><div className="h-2 rounded-full bg-stone-100"><div className="h-2 rounded-full bg-moss-500" style={{ width: `${item.value || 0}%` }} /></div></div>)}</div></Panel></div>
     {type === 'incident' && <div className="grid gap-5 lg:grid-cols-2"><Panel title="Category distribution" subtitle="Categories returned by the analytics API"><DataList items={categoryEntries} empty="No category distribution was returned." /></Panel><Panel title="Category-by-period trend" subtitle="Category activity over time"><DataList items={categoryTrend} empty="No category trend was returned." /></Panel></div>}
     {type === 'terrain' && <Panel title="Terrain hotspots" subtitle="Areas requiring attention"><DataList items={hotspots.map((item) => ({ label: item.name || item.code || item.zone, value: item.incidents ?? item.value ?? item.count ?? '—' }))} empty="No terrain hotspots were returned." /></Panel>}
@@ -164,17 +167,8 @@ function TrendChart({ trend, maxTrend }) {
 }
 export function ComparisonPanel({ comparison }) {
   const entries = Object.entries(comparison || {});
-  const groups = buildComparisonGroups(comparison || {});
-  const totals = buildComparisonTotals(comparison || {});
   return <Panel title="Comparison with baseline" subtitle="Selected period compared with the previous reporting period">
     {!entries.length ? <p className="text-sm text-stone-500">No baseline comparison data was returned.</p> : <div className="space-y-4">
-      {totals && <div className="flex flex-wrap items-center gap-2 rounded-lg bg-park-50 px-3 py-2 text-sm text-park-800">
-        <span className="font-semibold">Current: {totals.current}</span>
-        <span className="text-stone-400">vs</span>
-        <span>Baseline: {totals.baseline}</span>
-        <ChangeBadge change={totals.change} percent={totals.percent} />
-      </div>}
-      {groups.length > 0 && <ComparisonBarChart groups={groups} />}
       {entries.map(([label, value]) => {
         const isMetric = value && typeof value === 'object' && (
           Object.prototype.hasOwnProperty.call(value, 'current')
@@ -187,100 +181,6 @@ export function ComparisonPanel({ comparison }) {
       })}
     </div>}
   </Panel>;
-}
-function toNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-function metricNumbers(metric) {
-  if (metric == null || typeof metric !== 'object') return null;
-  const current = metric.current ?? metric.value ?? 0;
-  const baseline = metric.baseline ?? 0;
-  const change = metric.variance ?? metric.change ?? (toNum(current) - toNum(baseline));
-  const percent = metric.variancePercent ?? null;
-  return { current: toNum(current), baseline: toNum(baseline), change: typeof change === 'number' ? change : toNum(change), percent: typeof percent === 'number' ? percent : null };
-}
-function buildComparisonTotals(comparison) {
-  const inc = comparison.incidentCount ? metricNumbers(comparison.incidentCount) : null;
-  if (!inc) return null;
-  return { current: inc.current, baseline: inc.baseline, change: inc.change, percent: inc.percent };
-}
-function buildComparisonGroups(comparison) {
-  const zoneMap = comparison.incidentDensity || comparison.patrolHours || null;
-  if (zoneMap && typeof zoneMap === 'object' && !('current' in zoneMap)) {
-    return Object.entries(zoneMap).map(([zone, metric]) => {
-      const nums = metricNumbers(metric) || { current: 0, baseline: 0, change: 0, percent: null };
-      return { label: ZONE_LABELS[zone] || zone, ...nums };
-    });
-  }
-  const out = [];
-  if (comparison.incidentCount) {
-    const nums = metricNumbers(comparison.incidentCount);
-    if (nums) out.push({ label: 'Incidents', ...nums });
-  }
-  if (comparison.patrolCount) {
-    const nums = metricNumbers(comparison.patrolCount);
-    if (nums) out.push({ label: 'Patrols', ...nums });
-  }
-  return out;
-}
-function ChangeBadge({ change, percent }) {
-  const num = typeof change === 'number' ? change : toNum(change);
-  const tone = num > 0 ? 'bg-alert-100 text-alert-600' : num < 0 ? 'bg-moss-500/10 text-moss-500' : 'bg-stone-100 text-stone-600';
-  const sign = num > 0 ? '+' : '';
-  const pct = typeof percent === 'number' ? ` (${percent > 0 ? '+' : ''}${percent}%)` : '';
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tone}`}>{`${sign}${num}${pct}`}</span>;
-}
-function ComparisonBarChart({ groups }) {
-  if (!groups?.length) return null;
-  const width = 720;
-  const height = 260;
-  const left = 44;
-  const right = 16;
-  const top = 20;
-  const bottom = 52;
-  const chartWidth = width - left - right;
-  const chartHeight = height - top - bottom;
-  const maxVal = Math.max(...groups.flatMap((g) => [g.current, g.baseline]), 0);
-  const max = maxVal === 0 ? 1 : maxVal;
-  const gridValues = [...new Set([0, Math.ceil(max / 2), max])];
-  const groupStep = chartWidth / Math.max(groups.length, 1);
-  const barWidth = Math.min(42, Math.max(16, groupStep * 0.26));
-  const gap = 6;
-  return <div className="rounded-lg border border-stone-200 p-3">
-    <div className="mb-2 flex items-center gap-4 text-xs text-stone-500">
-      <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-moss-500" />Current</span>
-      <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-stone-300" />Baseline</span>
-    </div>
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Current versus baseline comparison graph" className="h-56 min-w-[520px] w-full">
-        {gridValues.map((value) => {
-          const y = top + chartHeight - (value / max) * chartHeight;
-          return <g key={value}><line x1={left} x2={width - right} y1={y} y2={y} stroke="#e9e6da" strokeDasharray="3 4" /><text x={left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#78716c">{value}</text></g>;
-        })}
-        <line x1={left} x2={width - right} y1={top + chartHeight} y2={top + chartHeight} stroke="#a8a29e" />
-        {groups.map((g, index) => {
-          const cx = left + groupStep * index + groupStep / 2;
-          const curH = (g.current / max) * chartHeight;
-          const baseH = (g.baseline / max) * chartHeight;
-          const curX = cx - barWidth - gap / 2;
-          const baseX = cx + gap / 2;
-          return <g key={g.label}>
-            <rect x={curX} y={top + chartHeight - curH} width={barWidth} height={Math.max(curH, g.current ? 4 : 0)} rx="5" fill="#2e7d4f" opacity="0.9">
-              <title>{`${g.label} current: ${g.current}`}</title>
-            </rect>
-            <rect x={baseX} y={top + chartHeight - baseH} width={barWidth} height={Math.max(baseH, g.baseline ? 4 : 0)} rx="5" fill="#d6d0bd">
-              <title>{`${g.label} baseline: ${g.baseline}`}</title>
-            </rect>
-            <text x={curX + barWidth / 2} y={Math.max(top + chartHeight - curH - 6, 12)} textAnchor="middle" fontSize="11" fontWeight="700" fill="#123a2d">{g.current}</text>
-            <text x={baseX + barWidth / 2} y={Math.max(top + chartHeight - baseH - 6, 12)} textAnchor="middle" fontSize="10" fill="#78716c">{g.baseline}</text>
-            <text x={cx} y={height - 28} textAnchor="middle" fontSize="10" fill="#78716c">{g.label.length > 14 ? `${g.label.slice(0, 13)}…` : g.label}</text>
-            <text x={cx} y={height - 14} textAnchor="middle" fontSize="10" fontWeight="700" fill={g.change > 0 ? '#b3402a' : g.change < 0 ? '#2e7d4f' : '#78716c'}>{`${g.change > 0 ? '+' : ''}${g.change}${typeof g.percent === 'number' ? ` (${g.percent > 0 ? '+' : ''}${g.percent}%)` : ''}`}</text>
-          </g>;
-        })}
-      </svg>
-    </div>
-  </div>;
 }
 function ComparisonMetric({ label, value, compact = false }) {
   const variance = value.variance ?? value.value ?? value.change ?? 0;

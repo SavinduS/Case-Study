@@ -66,8 +66,7 @@ backend/
   seed/          referenceData (shared), seedReferenceData, resetOperationalData
 
 frontend/web/src/
-  layout/                      Topbar (wordmark, 3 tabs, session + Sign out)
-                               + module rail over the map
+  layout/                      Topbar (session + Sign out) + module rail
   layout/usePortalSession.js   Session for the dashboard, incl. app handoff
   components/ui/               Button, Badge, Modal, ModulePlaceholder
   pages/LoginPage.jsx          Portal sign-in (email or phone)
@@ -85,12 +84,6 @@ frontend/web/src/
     components/panels/         Collar registry + geofence register
     pages/DashboardPage.jsx    Screen composition
   features/reports/components/AnalyticsShell.jsx  Shell for the reports workspace
-  features/villager-reports/
-    domain/labels.js           Conflict-report enums and display labels
-    hooks/useVillagerReports.js  Polls GET /api/conflict-reports, groups by
-                                channel and category
-    pages/VillagerReportsPage.jsx  Full-screen reports workspace at
-                                   /villager-reports
 ```
 
 ### Division of responsibility
@@ -318,27 +311,16 @@ password is `password123`:
   only sees the reports it generated (`createdBy` scoping is unchanged), and
   `/api/analytics` still refuses villagers and rangers.
 - **Navigation carries nothing the officer cannot use.** The top bar has
-  exactly three tabs — **Dashboard**, **Villager Reports** and **Reports** — and
-  all three open working features. Data Logs and Map View were placeholders for
-  shared-platform modules, and the map is already the dashboard's full-bleed
-  background, so neither earned a tab. The module rail offers the
-  collar/alert/geofence panels this use case owns plus the other members'
-  modules, each labelled with its owner. Villager reports and the analytics
-  reports are workspaces rather than panels over the map, so they are not in
-  the rail; analytics keeps a rail entry because it is the officer's quickest
-  route to the same figures. Administration is absent for the same reason — it
-  is not this shift's work — and no backend route was removed to hide it.
+  exactly two tabs — **Dashboard** and **Reports** — and both open working
+  features. Data Logs and Map View were placeholders for shared-platform
+  modules, and the map is already the dashboard's full-bleed background, so
+  neither earned a tab. The module rail offers the collar/alert/geofence panels
+  this use case owns plus the other members' modules, each labelled with its
+  owner; reports are a workspace, not a panel over the map, so they are not in
+  the rail either. Administration is absent for the same reason — it is not this
+  shift's work — and no backend route was removed to hide it.
 - **The reports workspace has a way back.** The officer reaches it from the top
   bar, so `AnalyticsShell` carries a "Back to dashboard" link for that role.
-- **Villager conflict reports are read-only here.** `GET /api/conflict-reports`
-  is scoped to `officer`/`manager` and the workspace groups what it returns two
-  ways: by channel (SMS hotline vs field app, because the gateway produces a
-  materially thinner record — no photo, no GPS accuracy, sometimes no
-  description) and by incident type. Both groupings count the same unfiltered
-  set, so the numbers cannot disagree. The page deliberately offers no status
-  control: the backend defines `RECEIVED`/`UNDER_REVIEW`/`ACTION_REQUIRED`/
-  `RESOLVED` but exposes no route that advances them, so nothing in the UI
-  claims a report was handled when no request was made.
   Without it they were trapped in what looked like the Park Manager's view. The
   Park Manager is not offered the link, because that workspace is their home.
 - **The top bar names the role once.** The role label and the display name sat

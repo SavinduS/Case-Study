@@ -108,11 +108,12 @@ function validateFieldIncident(input = {}, options = {}) {
     value.capturedAt = capturedAt;
   }
 
-  // photo: required, JPEG or PNG, up to 5 MB (mirrors utils/upload.js
-  // conventions: 415 wrong type, 413 too large — mapped by the F2 route)
+  // photo: optional, JPEG or PNG, up to 5 MB when supplied (mirrors
+  // utils/upload.js conventions: 415 wrong type, 413 too large — mapped by
+  // the field-incident route)
   const photo = input.photo || input.file || options.file || null;
-  if (!photo) {
-    push('photo', 'Photo is required');
+  if (!photo || (typeof photo === 'string' && photo.trim() === '')) {
+    // No photo attached — valid. Mobile decision: photos are optional.
   } else {
     const mimeType = photo.mimeType ?? photo.mimetype ?? photo.type;
     const size = photo.size !== undefined && photo.size !== null && photo.size !== ''

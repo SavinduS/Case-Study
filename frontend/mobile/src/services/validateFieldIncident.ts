@@ -4,6 +4,7 @@ import type {
   FieldIncidentErrors,
   ValidatedFieldIncident
 } from '../fieldIncidentTypes.ts';
+import { photoExtensionError } from './validatePhoto';
 
 // Pure validator: no React Native imports, so it stays unit-testable with
 // plain `node --test`. NOTE: the `.ts` extensions above are intentional -
@@ -18,10 +19,15 @@ export function validateFieldIncident(draft: FieldIncidentDraft): FieldIncidentE
   const description = draft.description.trim();
   if (!description) {
     errors.description = 'Enter a short description of what you found.';
-  } else if (draft.description.length > MAX_DESCRIPTION_LENGTH) {
+  } else if (description.length > MAX_DESCRIPTION_LENGTH) {
     errors.description =
       `Keep the description within ${MAX_DESCRIPTION_LENGTH} characters ` +
-      `(currently ${draft.description.length}).`;
+      `(currently ${description.length}).`;
+  }
+
+  const photoError = photoExtensionError(draft.photoUri);
+  if (photoError) {
+    errors.photo = photoError;
   }
 
   if (!draft.location) {
@@ -40,11 +46,16 @@ export function toValidatedFieldIncident(
   const errors = validateFieldIncident(draft);
   if (Object.keys(errors).length > 0) return null;
   if (!draft.incidentType || !draft.location) return null;
+  const patrolId =
+    draft.patrolId !== undefined && draft.patrolId !== null && draft.patrolId.trim() !== ''
+      ? draft.patrolId.trim()
+      : null;
   return {
     capturedAt: draft.capturedAt,
     incidentType: draft.incidentType,
     description: draft.description.trim(),
     location: draft.location,
-    photoUri: draft.photoUri
+    photoUri: draft.photoUri,
+    patrolId
   };
 }

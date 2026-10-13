@@ -11,9 +11,10 @@ import {
 import LocationCard from '../components/LocationCard';
 import PhotoPicker from '../components/PhotoPicker';
 import PrimaryButton from '../components/PrimaryButton';
+import RangerIcon, { type RangerIconName } from '../components/RangerIcon';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsFix } from '../services/location';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 import DescriptionInput from '../components/DescriptionInput';
 import FieldIncidentTypePicker from '../components/FieldIncidentTypePicker';
 import OfflineBadge from '../components/OfflineBadge';
@@ -36,6 +37,23 @@ interface Props {
 // Date/time auto-captured read-only, GPS card with manual fallback, incident
 // type, 500-char description, photo evidence, offline badge + notice, and a
 // Review Incident button. No persistence / API / sync here (later features).
+// Section heading with a professional icon. Wording, validation, and the
+// Review → Edit → Submit flow are unchanged.
+function SectionLabel({
+  icon,
+  children
+}: {
+  icon: RangerIconName;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.labelRow}>
+      <RangerIcon name={icon} size={16} color={colors.textMuted} />
+      <Text style={styles.labelText}>{children}</Text>
+    </View>
+  );
+}
+
 export default function NewFieldIncidentScreen({
   initialDraft,
   manualFix,
@@ -59,7 +77,10 @@ export default function NewFieldIncidentScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>New Incident</Text>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.headerTitle}>New Incident</Text>
+          <Text style={styles.headerSubtitle}>Capture a field report for offline storage and later sync.</Text>
+        </View>
         <OfflineBadge />
       </View>
 
@@ -75,7 +96,7 @@ export default function NewFieldIncidentScreen({
           />
         ) : null}
 
-        <Text style={styles.label}>Date and Time</Text>
+        <SectionLabel icon="calendar-clock-outline">Date and Time</SectionLabel>
         <View style={styles.card}>
           <Text accessibilityLabel={`Captured date and time: ${capturedLabel}`} style={styles.dateValue}>
             {capturedLabel}
@@ -83,9 +104,9 @@ export default function NewFieldIncidentScreen({
           <Text style={styles.caption}>Automatically captured</Text>
         </View>
 
-        <Text style={styles.label}>
+        <SectionLabel icon="crosshairs-gps">
           GPS Location <Text style={styles.required}>*</Text>
-        </Text>
+        </SectionLabel>
         <LocationCard
           gps={fieldLocation.gps}
           error={form.attempted ? form.errors.location : undefined}
@@ -102,25 +123,25 @@ export default function NewFieldIncidentScreen({
           </Pressable>
         ) : null}
 
-        <Text style={styles.label}>
+        <SectionLabel icon="clipboard-list-outline">
           Incident Type <Text style={styles.required}>*</Text>
-        </Text>
+        </SectionLabel>
         <FieldIncidentTypePicker
           value={form.incidentType}
           onChange={form.setIncidentType}
           error={form.attempted ? form.errors.incidentType : undefined}
         />
 
-        <Text style={styles.label}>
+        <SectionLabel icon="pencil-outline">
           Description <Text style={styles.required}>*</Text>
-        </Text>
+        </SectionLabel>
         <DescriptionInput
           value={form.description}
           onChange={form.setDescription}
           error={form.attempted ? form.errors.description : undefined}
         />
 
-        <Text style={styles.label}>Photographic Evidence</Text>
+        <SectionLabel icon="camera-outline">Photographic Evidence</SectionLabel>
         <PhotoPicker
           photoUri={form.photoUri}
           photoError={form.photoError}
@@ -154,24 +175,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
+  headerTextWrap: {
+    flex: 1,
+    marginRight: spacing.sm
+  },
   headerTitle: {
     color: colors.white,
     fontSize: font.section,
-    fontWeight: '700'
+    fontWeight: '800'
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: font.small,
+    marginTop: 2
   },
   content: {
     padding: spacing.md,
     paddingBottom: spacing.xl,
     backgroundColor: colors.bg
   },
-  label: {
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm
+  },
+  labelText: {
     color: colors.textMuted,
     fontSize: font.tiny,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm
+    letterSpacing: 1
   },
   required: {
     color: colors.danger
@@ -195,7 +230,7 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   retryButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,

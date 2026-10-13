@@ -141,24 +141,6 @@ export const reportSignalLost = (collarId, lost = true, reason) =>
 export const submitFix = (fixs, { delayed = false } = {}) =>
   request('/telemetry/fixes', { method: 'POST', body: { fixes: fixs, delayed } });
 
-/**
- * Villager conflict reports, newest first. The server scopes this list to the
- * officer/manager role and strips the reporter's ObjectId, but keeps their
- * contact number so the officer can call them back.
- *
- * `filters` maps onto the server's query params (`status`, `incidentType`,
- * `since`, `limit`); it is left out entirely rather than sent empty so the
- * server applies its own defaults.
- */
-export function getConflictReports(filters = {}) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
-  }
-  const query = params.toString();
-  return request(`/conflict-reports${query ? `?${query}` : ''}`);
-}
-
 // Field incidents (ranger offline flow). `body.clientId` is the device-made
 // idempotency key the offline queue attaches — see src/offline/syncQueue.js.
 export const createIncident = (body) => request('/incidents', { method: 'POST', body });

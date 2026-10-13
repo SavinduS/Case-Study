@@ -9,10 +9,13 @@ export interface TabBarTab {
   label: string;
 }
 
-/** Ranger: capture an incident in the field, then review what is still on the device. */
+/** Ranger dashboard (compact navigation): Reported Incidents first (default
+ * landing), Add New Incident second. Ids are unchanged so existing routing
+ * keeps working; the wide layout uses RangerSidebar with the same order plus
+ * Sync Reports and Logout. */
 export const RANGER_TABS: TabBarTab[] = [
-  { id: 'report', icon: '📝', label: 'Report Incident' },
-  { id: 'myIncidents', icon: '📋', label: 'My Incidents' }
+  { id: 'myIncidents', icon: '📋', label: 'Reported Incidents' },
+  { id: 'report', icon: '➕', label: 'Add New Incident' }
 ];
 
 /** Villager: raise a conflict report, track the reports sent from this phone,

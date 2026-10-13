@@ -28,10 +28,12 @@ const fieldIncidentSchema = new mongoose.Schema({
   capturedAt: { type: Date, required: true },
   // Server time the report arrived (i.e. when it became Synchronized).
   receivedAt: { type: Date, default: Date.now },
+  // Photographic evidence is optional (mobile decision). When supplied the
+  // route validator enforces JPEG/PNG and the 5 MB limit before save.
   photo: {
-    path: { type: String, required: true },
-    mimeType: { type: String, required: true },
-    size: { type: Number, required: true }
+    path: { type: String },
+    mimeType: { type: String },
+    size: { type: Number }
   },
   reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   patrolId: { type: String }
