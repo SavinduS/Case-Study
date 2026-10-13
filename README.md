@@ -398,3 +398,28 @@ npm run typecheck -w frontend/mobile
 `tests/auth.test.js` covers login (all four roles, missing fields, wrong
 password answering the same as an unknown phone) and `/me` (valid token, no
 token, bad token, deleted account).
+
+## Linting (ESLint)
+
+ESLint is configured at the repository root (`eslint.config.mjs`) and covers
+all three workspaces: Node/CommonJS rules for `backend`, browser rules for the
+web dashboard, and `typescript-eslint` + React Hooks rules for the mobile app.
+Run it from the repository root in the VS Code terminal:
+
+```bash
+npm run lint                              # whole repo
+npx eslint backend                        # one workspace
+npx eslint frontend/mobile/src            # one folder
+npx eslint backend/utils/smsParser.js     # a single file
+npx eslint backend --format compact       # one line per problem
+```
+
+The output lists `error` findings (real problems) separately from `warning`
+findings (smells such as unused variables). A clean run prints nothing and
+exits with code 0; any `error` exits with code 1, so it can gate a commit or
+CI job. Nothing is auto-fixed — `npx eslint <path> --fix` applies fixes only
+when you ask for them.
+
+For live feedback while typing, install the **ESLint** extension
+(`dbaeumer.vscode-eslint`); the same findings appear as squiggles in the
+editor without running the terminal command.
