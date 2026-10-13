@@ -408,12 +408,6 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
       {body}
       {drawerOpen ? (
         <View style={styles.drawerOverlay}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close navigation menu"
-            onPress={() => setDrawerOpen(false)}
-            style={styles.drawerScrim}
-          />
           <View style={styles.drawerPanel}>
             <RangerSidebar
               active={sidebarActive}
@@ -424,6 +418,12 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
               onSignOut={onSignOut}
             />
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close navigation menu"
+            onPress={() => setDrawerOpen(false)}
+            style={styles.drawerScrim}
+          />
         </View>
       ) : null}
     </View>
