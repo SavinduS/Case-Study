@@ -21,7 +21,7 @@ import {
 } from '../constants/fieldIncident';
 import type { FieldIncidentType } from '../fieldIncidentTypes';
 import type { StoredFieldIncident } from '../services/incidentStorage';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 export type { StoredFieldIncident };
 
@@ -34,6 +34,8 @@ interface Props {
   syncError?: string | null;
   /** True while stored reports are being loaded from the device. */
   loading?: boolean;
+  /** Per-row retry for failed reports (same submit path, same reportId). */
+  onRetryReport?: (id: string) => void;
 }
 
 type StatusFilter = 'all' | StoredFieldIncident['status'];
@@ -72,7 +74,8 @@ export default function MyIncidentsScreen({
   onSyncNow,
   onNewReport,
   syncError,
-  loading = false
+  loading = false,
+  onRetryReport
 }: Props) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -319,6 +322,17 @@ export default function MyIncidentsScreen({
                   {item.status === 'failed' && item.lastError ? (
                     <Text style={styles.cardError}>{item.lastError}</Text>
                   ) : null}
+                  {item.status === 'failed' && onRetryReport ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Retry ${detailLabel(item)}`}
+                      onPress={() => onRetryReport(item.id)}
+                      style={({ pressed }) => [styles.retryButton, pressed && styles.retryPressed]}
+                    >
+                      <RangerIcon name="sync" size={16} color={colors.primaryDark} />
+                      <Text style={styles.retryText}>Retry</Text>
+                    </Pressable>
+                  ) : null}
 
                   {expanded ? (
                     <View style={styles.details}>
@@ -453,7 +467,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
-    minHeight: 48
+    minHeight: MIN_TOUCH_TARGET
   },
   searchIcon: {
     marginRight: spacing.xs
@@ -484,7 +498,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    minHeight: 36,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center'
   },
   chipSelected: {
@@ -519,7 +533,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 36,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
   },
@@ -560,6 +574,28 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: font.small
   },
+  retryButton: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft
+  },
+  retryPressed: {
+    opacity: 0.6
+  },
+  retryText: {
+    color: colors.primaryDark,
+    fontSize: font.body,
+    fontWeight: '700'
+  },
   details: {
     marginTop: spacing.xs,
     gap: 2,
@@ -583,7 +619,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'flex-start'
   },
   detailsPressed: {

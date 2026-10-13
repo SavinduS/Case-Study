@@ -3,6 +3,7 @@ import { act, create } from 'react-test-renderer';
 import MyIncidentsScreen from '../screens/MyIncidentsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import RangerSidebar, { RANGER_SIDEBAR_ITEMS } from '../components/RangerSidebar';
+import RangerIcon from '../components/RangerIcon';
 import StatusChip from '../components/StatusChip';
 import StatTile from '../components/StatTile';
 import type { AuthSession } from '../auth/types';
@@ -160,12 +161,33 @@ describe('RangerSidebar navigation order (Incident Reports first)', () => {
   });
 });
 
+describe('RangerIcon (shared vector set)', () => {
+  it('defaults to size 20 and passes name and color through', () => {
+    let r: any = null;
+    act(() => {
+      r = create(<RangerIcon name="leaf" color="#1B5E20" />);
+    });
+    const icon = r.root.findAll((n: any) => n.type === 'Text' && n.props.size === 20)[0];
+    expect(icon).toBeTruthy();
+    expect(icon.props.color).toBe('#1B5E20');
+  });
+
+  it('honors an explicit size', () => {
+    let r: any = null;
+    act(() => {
+      r = create(<RangerIcon name="menu" size={24} color="#FFFFFF" />);
+    });
+    const icon = r.root.findAll((n: any) => n.type === 'Text' && n.props.size === 24)[0];
+    expect(icon).toBeTruthy();
+  });
+});
+
 describe('StatusChip', () => {
   it.each([
     ['pending', 'Pending Synchronization'],
     ['synced', 'Synchronized'],
     ['failed', 'Failed']
-  ] as const)('shows text for %s', (status, label) => {
+  ] as const)('shows text for %s', (status: 'pending' | 'synced' | 'failed', label: string) => {
     let r: any = null;
     act(() => {
       r = create(<StatusChip status={status} />);
@@ -403,6 +425,52 @@ describe('MyIncidentsScreen View details expansion', () => {
     const toggle = hostPressablesByLabel(r.root, 'View details for FI-2026-0001')[0];
     act(() => toggle.props.onPress());
     expect(texts(r.root)).toMatch(/Photo evidence attached/);
+  });
+});
+
+describe('MyIncidentsScreen per-row Retry (failed reports)', () => {
+  function listWithRetry(items: StoredFieldIncident[], onRetryReport?: (id: string) => void) {
+    let r: any = null;
+    act(() => {
+      r = create(
+        <MyIncidentsScreen
+          incidents={items}
+          syncing={false}
+          onSyncNow={jest.fn()}
+          onNewReport={jest.fn()}
+          onRetryReport={onRetryReport}
+        />
+      );
+    });
+    return r;
+  }
+
+  it('failed rows offer Retry with the report reference', () => {
+    const failed = { ...row('c', 'failed'), lastError: 'Rejected: blurry photo' };
+    const r = listWithRetry([failed], jest.fn());
+    expect(texts(r.root)).toMatch(/Rejected: blurry photo/);
+    expect(hostPressablesByLabel(r.root, 'Retry FI-2026-0001')).toHaveLength(1);
+  });
+
+  it('Retry calls onRetryReport with the stored row id', () => {
+    const failed = row('c', 'failed');
+    const onRetryReport = jest.fn();
+    const r = listWithRetry([failed], onRetryReport);
+    const btn = hostPressablesByLabel(r.root, 'Retry FI-2026-0001')[0];
+    act(() => btn.props.onPress());
+    expect(onRetryReport).toHaveBeenCalledTimes(1);
+    expect(onRetryReport).toHaveBeenCalledWith('c');
+  });
+
+  it('pending and synced rows offer no Retry', () => {
+    const r = listWithRetry([row('a', 'pending'), row('b', 'synced')], jest.fn());
+    expect(hostPressablesByLabel(r.root, 'Retry FI-2026-0001')).toHaveLength(0);
+  });
+
+  it('no Retry button renders when the handler is absent', () => {
+    const r = listWithRetry([{ ...row('c', 'failed'), lastError: 'Rejected' }]);
+    expect(hostPressablesByLabel(r.root, 'Retry FI-2026-0001')).toHaveLength(0);
+    expect(texts(r.root)).toMatch(/Rejected/);
   });
 });
 

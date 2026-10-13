@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { validateFieldIncident } from '../services/validateFieldIncident';
+import { validatePhotoUriAsync } from '../services/validatePhoto';
 import type {
   FieldIncidentDraft,
   FieldIncidentErrors,
@@ -58,10 +59,20 @@ export function useFieldIncidentForm(
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldIncidentErrors>({});
   const [attempted, setAttempted] = useState(false);
+  // Latest photo URI: guards the async size/type check below so a slow
+  // lookup for a removed photo can never flag the current (empty) value.
+  const latestPhotoUri = useRef<string | null>(options?.initialDraft?.photoUri ?? null);
 
   function handlePhotoChange(uri: string | null) {
+    latestPhotoUri.current = uri;
     setPhotoUriState(uri);
     setPhotoError(null);
+    if (!uri) return;
+    // Async size/type validation surfaces inline on the form (before Review);
+    // unknown sizes stay allowed and the server (413/415) remains authoritative.
+    void validatePhotoUriAsync(uri).then((error) => {
+      if (latestPhotoUri.current === uri) setPhotoError(error);
+    });
   }
 
   function review(location: FieldIncidentLocation | null): ValidatedFieldIncident | null {
@@ -74,6 +85,9 @@ export function useFieldIncidentForm(
       patrolId
     };
     const nextErrors = validateFieldIncident(draft);
+    // Fold a resolved async photo error (e.g. oversize file) into the sync
+    // errors so Review blocks with the inline message already shown.
+    if (!nextErrors.photo && photoError) nextErrors.photo = photoError;
     setErrors(nextErrors);
     setAttempted(true);
     if (Object.keys(nextErrors).length > 0) return null;

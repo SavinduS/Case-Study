@@ -22,10 +22,10 @@ import SubmitResultScreen from './src/screens/SubmitResultScreen';
 import VillagerShell from './src/screens/VillagerShell';
 import WebDashboardScreen from './src/screens/WebDashboardScreen';
 import type { FieldIncidentDraft } from './src/fieldIncidentTypes';
-import { useRangerIncidents } from './src/hooks/useRangerIncidents';
+import { useRangerIncidents, viewForSubmitOutcome } from './src/hooks/useRangerIncidents';
 import type { StoredFieldIncident } from './src/services/incidentStorage';
 import type { GpsFix } from './src/services/location';
-import { colors, font, spacing } from './src/theme';
+import { colors, font, MIN_TOUCH_TARGET, spacing } from './src/theme';
 import type { ValidatedFieldIncident } from './src/fieldIncidentTypes';
 
 // Log Field Incident Offline flow only:
@@ -212,6 +212,7 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
     submitError,
     syncError,
     submitReport,
+    retryReport,
     syncNow,
     clearSubmitError
   } = useRangerIncidents(token);
@@ -264,20 +265,46 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
   // F2 -> result: offline-first submit. Offline (or network failure) keeps
   // the report pending and shows the pending confirmation; a reachable server
   // takes it directly (Alt Flow 3) and the result shows Synchronized. A
-  // permanent rejection stays on review with the error for correction, and a
-  // full device store keeps the draft (reviewed) intact for retry.
+  // permanent rejection (Exc Flow 1) goes to the result screen in its failed
+  // state (reason + Retry) instead of stranding the ranger on Review; a full
+  // device store keeps the draft (reviewed) intact for retry.
   async function handleSubmit() {
     if (!reviewed || submitting) return;
     const outcome = await submitReport(reviewed, editingId);
+    if (viewForSubmitOutcome(outcome) === 'review') return;
     if ('error' in outcome) {
       if (!outcome.stored) return;
-      // Validation rejection or storage failure: stay on review so the ranger
-      // can correct and resubmit; the draft and reportId are preserved.
+      setLastResult(outcome.stored);
+      setView('result');
       return;
     }
     setLastResult(outcome.stored);
     setEditingId(null);
     setView('result');
+  }
+
+  // Result-screen Retry: re-attempts the same stored reportId (never a
+  // duplicate) and stays on the result screen showing the new outcome.
+  async function handleRetry() {
+    if (!lastResult || submitting) return;
+    const outcome = await retryReport(lastResult);
+    if ('error' in outcome) {
+      if (!outcome.stored) return;
+      setLastResult(outcome.stored);
+      return;
+    }
+    setLastResult(outcome.stored);
+    setEditingId(null);
+  }
+
+  // My Incidents per-row Retry: same path as result-screen retry; the list
+  // refreshes through the hook so the new badge shows in place.
+  function handleRowRetry(id: string) {
+    void (async () => {
+      const row = saved.find((i) => i.id === id || i.reportId === id);
+      if (!row) return;
+      await retryReport(row);
+    })();
   }
 
   function handleNewReport() {
@@ -344,8 +371,11 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
       ) : view === 'result' && lastResult ? (
         <SubmitResultScreen
           incident={lastResult.incident}
-          status={lastResult.status === 'synced' ? 'synced' : 'pending'}
+          status={lastResult.status}
           displayId={lastResult.displayId ?? null}
+          submitError={lastResult.lastError ?? submitError}
+          onRetry={() => void handleRetry()}
+          onEditReport={handleEdit}
           onGoToMyIncidents={() => setView('myIncidents')}
           onNewReport={handleNewReport}
         />
@@ -357,6 +387,7 @@ function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token:
           loading={incidentsLoading}
           onSyncNow={handleSyncNow}
           onNewReport={handleNewReport}
+          onRetryReport={handleRowRetry}
         />
       ) : view === 'profile' ? (
         <ProfileScreen user={user} onSignOut={onSignOut} />
@@ -457,8 +488,8 @@ const styles = StyleSheet.create({
     minHeight: 52
   },
   menuButton: {
-    minWidth: 48,
-    minHeight: 44,
+    minWidth: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8

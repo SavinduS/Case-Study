@@ -98,6 +98,28 @@ describe('validateFieldIncident (mobile)', () => {
     expect(validateFieldIncident({ ...baseDraft(), photoUri: 'file:///photo.jpg' })).toEqual({});
   });
 
+  it('rejects an unsupported photo type with a photo error', () => {
+    const errors = validateFieldIncident({ ...baseDraft(), photoUri: 'file:///notes.pdf' });
+    expect(errors.photo).toMatch(/JPEG or PNG/);
+    expect(errors.incidentType).toBeUndefined();
+  });
+
+  it('accepts jpeg and png photo extensions', () => {
+    for (const photoUri of ['file:///a.jpeg', 'file:///b.PNG', 'file:///c.JPG']) {
+      expect(validateFieldIncident({ ...baseDraft(), photoUri }).photo).toBeUndefined();
+    }
+  });
+
+  it('reports a photo error together with other field errors', () => {
+    const errors = validateFieldIncident({
+      ...baseDraft(),
+      incidentType: null,
+      photoUri: 'file:///notes.pdf'
+    });
+    expect(errors.photo).toMatch(/JPEG or PNG/);
+    expect(errors.incidentType).toBe('Select the type of incident.');
+  });
+
   it('toValidatedFieldIncident trims the description and preserves fields', () => {
     const result = toValidatedFieldIncident({ ...baseDraft(), description: '  snare near trail  ' });
     expect(result).not.toBeNull();
@@ -120,5 +142,18 @@ describe('validateFieldIncident (mobile)', () => {
       toValidatedFieldIncident({ ...baseDraft(), description: 'x'.repeat(501) })
     ).toBeNull();
   });
+
+  it('toValidatedFieldIncident trims an optional patrolId', () => {
+    expect(
+      toValidatedFieldIncident({ ...baseDraft(), patrolId: ' patrol-7 ' })?.patrolId
+    ).toBe('patrol-7');
+  });
+
+  it.each([['missing', undefined], ['null', null], ['blank', '   ']])(
+    'toValidatedFieldIncident drops a %s patrolId',
+    (_label: string, patrolId: string | null | undefined) => {
+      expect(toValidatedFieldIncident({ ...baseDraft(), patrolId })?.patrolId).toBeNull();
+    }
+  );
 });
 

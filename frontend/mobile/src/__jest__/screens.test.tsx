@@ -292,6 +292,92 @@ describe('SubmitResultScreen', () => {
     press(renderer.root, 'New Incident Report');
     expect(fresh).toHaveBeenCalledTimes(1);
   });
+
+  it('shows synced receipt with displayId', () => {
+    let renderer: any = null;
+    act(() => {
+      renderer = create(
+        <SubmitResultScreen
+          incident={validIncident()}
+          status="synced"
+          displayId="FI-2026-0001"
+          onGoToMyIncidents={jest.fn()}
+          onNewReport={jest.fn()}
+        />
+      );
+    });
+    const t = texts(renderer.root).join(' | ');
+    expect(t).toMatch(/Report Synchronized/);
+    expect(t).toMatch(/SYNCHRONIZED/);
+    expect(t).toMatch(/FI-2026-0001/);
+  });
+
+  it('failed state shows the rejection reason with Retry and Edit Report', () => {
+    let renderer: any = null;
+    act(() => {
+      renderer = create(
+        <SubmitResultScreen
+          incident={validIncident()}
+          status="failed"
+          submitError="Validation failed: description too short"
+          onRetry={jest.fn()}
+          onEditReport={jest.fn()}
+          onGoToMyIncidents={jest.fn()}
+          onNewReport={jest.fn()}
+        />
+      );
+    });
+    const t = texts(renderer.root).join(' | ');
+    expect(t).toMatch(/Report Not Accepted/);
+    expect(t).toMatch(/FAILED/);
+    expect(t).toMatch(/Validation failed: description too short/);
+    expect(t).toMatch(/Retry Submission/);
+    expect(t).toMatch(/Edit Report/);
+  });
+
+  it('failed Retry and Edit Report call their handlers', () => {
+    const onRetry = jest.fn();
+    const onEditReport = jest.fn();
+    let renderer: any = null;
+    act(() => {
+      renderer = create(
+        <SubmitResultScreen
+          incident={validIncident()}
+          status="failed"
+          submitError="Rejected"
+          onRetry={onRetry}
+          onEditReport={onEditReport}
+          onGoToMyIncidents={jest.fn()}
+          onNewReport={jest.fn()}
+        />
+      );
+    });
+    press(renderer.root, 'Retry Submission');
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    press(renderer.root, 'Edit report');
+    expect(onEditReport).toHaveBeenCalledTimes(1);
+    invokePressableStyles(renderer.root);
+  });
+
+  it('failed state without handlers still navigates away', () => {
+    const go = jest.fn();
+    let renderer: any = null;
+    act(() => {
+      renderer = create(
+        <SubmitResultScreen
+          incident={validIncident()}
+          status="failed"
+          onGoToMyIncidents={go}
+          onNewReport={jest.fn()}
+        />
+      );
+    });
+    const t = texts(renderer.root).join(' | ');
+    expect(t).toMatch(/Report Not Accepted/);
+    expect(t).not.toMatch(/Retry Submission/);
+    press(renderer.root, 'Go to My Incidents');
+    expect(go).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('MyIncidentsScreen status chips', () => {

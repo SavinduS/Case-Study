@@ -5,7 +5,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
 import { FIELD_INCIDENT_LABELS, OFFLINE_MESSAGE } from '../constants/fieldIncident';
 import type { ValidatedFieldIncident } from '../fieldIncidentTypes';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 interface Props {
   incident: ValidatedFieldIncident;
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   linkButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center'
   },
   linkText: {

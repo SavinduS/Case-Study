@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import PrimaryButton from '../components/PrimaryButton';
 import { getCurrentFix, GpsFix, requestLocationPermission } from '../services/location';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 interface Props {
   initialFix: GpsFix | null;
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   back: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
   },
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     fontSize: font.small
   },
   detect: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,

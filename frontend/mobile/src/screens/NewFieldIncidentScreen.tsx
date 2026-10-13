@@ -14,7 +14,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import RangerIcon, { type RangerIconName } from '../components/RangerIcon';
 import StatusBanner from '../components/StatusBanner';
 import type { GpsFix } from '../services/location';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 import DescriptionInput from '../components/DescriptionInput';
 import FieldIncidentTypePicker from '../components/FieldIncidentTypePicker';
 import OfflineBadge from '../components/OfflineBadge';
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   retryButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,

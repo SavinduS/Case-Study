@@ -38,6 +38,8 @@ module.exports = {
   collectCoverage: false,
   collectCoverageFrom: [
     'frontend/mobile/src/services/validateFieldIncident.ts',
+    'frontend/mobile/src/services/submitErrors.ts',
+    'frontend/mobile/src/services/connectivity.ts',
     'frontend/mobile/src/services/incidentStorage.ts',
     'frontend/mobile/src/services/syncService.ts',
     'frontend/mobile/src/services/location.ts',

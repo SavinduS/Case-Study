@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { useRangerIncidents } from '../hooks/useRangerIncidents';
+import { useRangerIncidents, viewForSubmitOutcome } from '../hooks/useRangerIncidents';
 import {
   INCIDENT_STORAGE_KEY,
   listStoredIncidents,
@@ -12,6 +12,7 @@ const { ApiError } = jest.requireActual('../api/client');
 const { pingServer } = require('../api/client');
 const { postFieldIncident } = require('../api/fieldIncidents');
 const AsyncStorage = require('@react-native-async-storage/async-storage');
+const NetInfo = require('@react-native-community/netinfo');
 
 jest.mock('../api/client', () => {
   const actual = jest.requireActual('../api/client');
@@ -53,6 +54,7 @@ async function flush() {
 
 beforeEach(() => {
   AsyncStorage.__reset();
+  NetInfo.__reset();
   jest.clearAllMocks();
   pingServer.mockResolvedValue({ reachable: false, base: 'http://test' });
 });
@@ -207,6 +209,226 @@ describe('useRangerIncidents', () => {
     const rows = await listStoredIncidents();
     expect(rows.find((r) => r.id === pending[0].id)?.status).toBe('synced');
     expect(rows.find((r) => r.id === pending[1].id)?.status).toBe('failed');
+    h.unmount();
+  });
+});
+
+describe('auto-sync on reconnect (Alt Flow 3)', () => {
+  it('offline -> online triggers a sync of pending rows', async () => {
+    await saveIncidentOffline(incident({ description: 'queued while offline' }));
+    postFieldIncident.mockResolvedValue({
+      reportId: 'auto-1',
+      displayId: 'FI-2026-0001',
+      photo: null
+    });
+    const h = renderHook();
+    await flush();
+    NetInfo.__emit(false); // baseline
+    await flush();
+    NetInfo.__emit(true); // reconnect
+    await flush();
+    await flush();
+    expect(postFieldIncident).toHaveBeenCalledTimes(1);
+    const rows = await listStoredIncidents();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('synced');
+    expect(rows[0].displayId).toBe('FI-2026-0001');
+    h.unmount();
+  });
+
+  it('online -> offline does not start a sync', async () => {
+    await saveIncidentOffline(incident({ description: 'still queued' }));
+    const h = renderHook();
+    await flush();
+    NetInfo.__emit(true); // baseline
+    await flush();
+    NetInfo.__emit(false); // loss of connectivity
+    await flush();
+    await flush();
+    expect(postFieldIncident).not.toHaveBeenCalled();
+    expect((await listStoredIncidents())[0].status).toBe('pending');
+    h.unmount();
+  });
+
+  it('duplicate reconnect events never run concurrent syncs', async () => {
+    await saveIncidentOffline(incident({ description: 'queued' }));
+    let release: ((value: unknown) => void) | null = null;
+    postFieldIncident.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    const h = renderHook();
+    await flush();
+    NetInfo.__emit(false); // baseline
+    await flush();
+    NetInfo.__emit(true); // first reconnect starts the run
+    await flush();
+    NetInfo.__emit(false);
+    await flush();
+    NetInfo.__emit(true); // second reconnect while the first run is in flight
+    await flush();
+    expect(postFieldIncident).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release!({ reportId: 'auto-1', displayId: 'FI-2026-0001', photo: null });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await flush();
+    expect(postFieldIncident).toHaveBeenCalledTimes(1);
+    expect((await listStoredIncidents())[0].status).toBe('synced');
+    h.unmount();
+  });
+
+  it('manual Sync Now during an auto-sync run does not duplicate work', async () => {
+    await saveIncidentOffline(incident({ description: 'queued' }));
+    let release: ((value: unknown) => void) | null = null;
+    postFieldIncident.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    const h = renderHook();
+    await flush();
+    NetInfo.__emit(false);
+    await flush();
+    NetInfo.__emit(true); // auto-sync starts
+    await flush();
+    await act(async () => {
+      await h.get().syncNow(); // manual tap while auto-sync is in flight
+    });
+    expect(postFieldIncident).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release!({ reportId: 'auto-1', displayId: 'FI-2026-0001', photo: null });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await flush();
+    expect(postFieldIncident).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+
+  it('unsubscribes the connectivity listener on unmount', async () => {
+    const h = renderHook();
+    await flush();
+    expect(NetInfo.__listenerCount()).toBe(1);
+    h.unmount();
+    expect(NetInfo.__listenerCount()).toBe(0);
+    postFieldIncident.mockResolvedValue({ reportId: 'x', displayId: 'FI-1', photo: null });
+    NetInfo.__emit(false);
+    NetInfo.__emit(true);
+    await flush();
+    expect(postFieldIncident).not.toHaveBeenCalled();
+  });
+
+  it('reconnect with zero pending is a no-op', async () => {
+    postFieldIncident.mockResolvedValue({ reportId: 'x', displayId: 'FI-1', photo: null });
+    const h = renderHook();
+    await flush();
+    NetInfo.__emit(false);
+    await flush();
+    NetInfo.__emit(true);
+    await flush();
+    await flush();
+    expect(postFieldIncident).not.toHaveBeenCalled();
+    expect(h.get().syncing).toBe(false);
+    expect(h.get().syncError).toBeNull();
+    h.unmount();
+  });
+});
+
+describe('viewForSubmitOutcome (submit -> result routing)', () => {
+  const failedRow: any = {
+    id: 'r1',
+    reportId: 'r1',
+    incident: incident(),
+    status: 'failed',
+    lastError: 'Validation failed'
+  };
+  const pendingRow: any = { ...failedRow, status: 'pending', lastError: undefined };
+
+  it('routes successes to the result screen', () => {
+    expect(viewForSubmitOutcome({ stored: pendingRow, mode: 'pending' })).toBe('result');
+    expect(viewForSubmitOutcome({ stored: { ...pendingRow, status: 'synced' }, mode: 'synced' })).toBe(
+      'result'
+    );
+  });
+
+  it('routes a stored rejection to the failed result state', () => {
+    expect(viewForSubmitOutcome({ error: 'Validation failed', stored: failedRow })).toBe('result');
+  });
+
+  it('stays on review when there is no stored row to show', () => {
+    expect(viewForSubmitOutcome({ error: 'You are signed out.', stored: null })).toBe('review');
+    expect(viewForSubmitOutcome({ error: 'Storage is full.', stored: pendingRow })).toBe('review');
+  });
+});
+
+describe('retryReport (same reportId, no duplicate)', () => {
+  it('retries a failed row and syncs it without creating a duplicate', async () => {
+    pingServer.mockResolvedValue({ reachable: true, base: 'http://test' });
+    postFieldIncident
+      .mockRejectedValueOnce(new ApiError(400, { message: 'Validation failed', errors: [] }))
+      .mockResolvedValueOnce({ reportId: 'retry-1', displayId: 'FI-2026-0007', photo: null });
+    const h = renderHook();
+    await flush();
+    let first: any = null;
+    await act(async () => {
+      first = await h.get().submitReport(incident({ description: 'retry me' }), null);
+    });
+    expect(first.stored.status).toBe('failed');
+    const failedRow = first.stored;
+    let second: any = null;
+    await act(async () => {
+      second = await h.get().retryReport(failedRow);
+    });
+    expect(second.mode).toBe('synced');
+    expect(second.stored.id).toBe(failedRow.id);
+    expect(second.stored.reportId).toBe(failedRow.reportId);
+    expect(postFieldIncident).toHaveBeenCalledTimes(2);
+    expect(postFieldIncident.mock.calls[0][0]).toBe(failedRow.reportId);
+    expect(postFieldIncident.mock.calls[1][0]).toBe(failedRow.reportId);
+    expect(await listStoredIncidents()).toHaveLength(1);
+    h.unmount();
+  });
+
+  it('retry while offline keeps the row pending without posting', async () => {
+    pingServer.mockResolvedValue({ reachable: false, base: 'http://test' });
+    const h = renderHook();
+    await flush();
+    let first: any = null;
+    await act(async () => {
+      first = await h.get().submitReport(incident({ description: 'offline row' }), null);
+    });
+    expect(first.mode).toBe('pending');
+    let second: any = null;
+    await act(async () => {
+      second = await h.get().retryReport(first.stored);
+    });
+    expect(second.mode).toBe('pending');
+    expect(second.stored.id).toBe(first.stored.id);
+    expect(postFieldIncident).not.toHaveBeenCalled();
+    expect(await listStoredIncidents()).toHaveLength(1);
+    h.unmount();
+  });
+
+  it('a repeated rejection stays failed and countable', async () => {
+    pingServer.mockResolvedValue({ reachable: true, base: 'http://test' });
+    postFieldIncident.mockRejectedValue(new ApiError(400, { message: 'Still bad', errors: [] }));
+    const h = renderHook();
+    await flush();
+    let outcome: any = null;
+    await act(async () => {
+      outcome = await h.get().submitReport(incident(), null);
+    });
+    const failedRow = outcome.stored;
+    await act(async () => {
+      outcome = await h.get().retryReport(failedRow);
+    });
+    expect(outcome.error).toMatch(/Still bad/);
+    expect(outcome.stored.status).toBe('failed');
+    expect(viewForSubmitOutcome(outcome)).toBe('result');
+    expect(await listStoredIncidents()).toHaveLength(1);
     h.unmount();
   });
 });

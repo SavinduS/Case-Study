@@ -23,6 +23,9 @@ export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 
 export const radius = { sm: 6, md: 10, lg: 16 };
 
+/** Minimum touch-target height for interactive elements (accessibility). */
+export const MIN_TOUCH_TARGET = 48;
+
 export const font = {
   title: 22,
   section: 16,
@@ -30,3 +33,21 @@ export const font = {
   small: 13,
   tiny: 12
 };
+
+function hexChannel(hex: string, index: 0 | 1 | 2): number {
+  const v = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
+  return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+
+/** Relative luminance of an #rrggbb color (WCAG definition). */
+export function luminance(hex: string): number {
+  const [r, g, b] = [hexChannel(hex, 0), hexChannel(hex, 1), hexChannel(hex, 2)];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio between two #rrggbb colors (1..21, AA needs ≥ 4.5). */
+export function contrastRatio(foreground: string, background: string): number {
+  const hi = Math.max(luminance(foreground), luminance(background));
+  const lo = Math.min(luminance(foreground), luminance(background));
+  return (hi + 0.05) / (lo + 0.05);
+}
