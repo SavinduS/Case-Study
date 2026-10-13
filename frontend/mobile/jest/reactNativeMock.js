@@ -17,6 +17,22 @@ const Pressable = mockHost('Pressable');
 const ActivityIndicator = mockHost('ActivityIndicator');
 const Image = mockHost('Image');
 const TextInput = mockHost('TextInput');
+const RefreshControl = mockHost('RefreshControl');
+
+function FlatList(props) {
+  const { data, renderItem, ListHeaderComponent, ListEmptyComponent, ...rest } = props || {};
+  const header = ListHeaderComponent
+    ? (React.isValidElement(ListHeaderComponent) ? ListHeaderComponent : React.createElement(React.Fragment, null))
+    : null;
+  const items = Array.isArray(data) && data.length > 0 && renderItem
+    ? data.map((item, index) => React.createElement(React.Fragment, { key: index }, renderItem({ item, index })))
+    : null;
+  const empty = (!Array.isArray(data) || data.length === 0) && ListEmptyComponent
+    ? (React.isValidElement(ListEmptyComponent) ? ListEmptyComponent : null)
+    : null;
+  return React.createElement('View', rest, header, items, empty);
+}
+FlatList.displayName = 'FlatList';
 
 const StyleSheet = {
   create: (styles) => styles,
@@ -41,6 +57,8 @@ module.exports = {
   ActivityIndicator,
   Image,
   TextInput,
+  FlatList,
+  RefreshControl,
   StyleSheet,
   Platform,
   Dimensions: { get: () => ({ width: 375, height: 812 }) },

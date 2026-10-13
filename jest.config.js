@@ -19,6 +19,8 @@ module.exports = {
     ]
   },
   moduleNameMapper: {
+    '^react$': '<rootDir>/frontend/mobile/node_modules/react',
+    '^react-test-renderer$': '<rootDir>/node_modules/react-test-renderer',
     '^react-native$': '<rootDir>/frontend/mobile/jest/reactNativeMock.js',
     '^@react-native-async-storage/async-storage$':
       '<rootDir>/frontend/mobile/jest/asyncStorageMock.js',
@@ -27,6 +29,8 @@ module.exports = {
     '^expo-file-system$': '<rootDir>/frontend/mobile/jest/expoFileSystemMock.js',
     '^expo-image-picker$': '<rootDir>/frontend/mobile/jest/expoImagePickerMock.js',
     '^react-native-safe-area-context$': '<rootDir>/frontend/mobile/jest/safeAreaMock.js',
+    '^@expo/vector-icons$': '<rootDir>/frontend/mobile/jest/vectorIconsMock.js',
+    '^@react-native-community/netinfo$': '<rootDir>/frontend/mobile/jest/netInfoMock.js',
     '^(.*)\\.ts$': '$1'
   },
   transformIgnorePatterns: ['node_modules/(?!(@react-native|react-native)/)'],
@@ -50,6 +54,10 @@ module.exports = {
     'frontend/mobile/src/components/PrimaryButton.tsx',
     'frontend/mobile/src/components/StatusBanner.tsx',
     'frontend/mobile/src/components/OfflineBadge.tsx',
+    'frontend/mobile/src/components/RangerIcon.tsx',
+    'frontend/mobile/src/components/RangerSidebar.tsx',
+    'frontend/mobile/src/components/StatTile.tsx',
+    'frontend/mobile/src/components/StatusChip.tsx',
     'frontend/mobile/src/constants/fieldIncident.ts',
     '!**/__tests__/**',
     '!**/__jest__/**',

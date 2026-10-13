@@ -48,6 +48,13 @@ export function useFieldIncidentForm(
   const [photoUri, setPhotoUriState] = useState<string | null>(
     options?.initialDraft?.photoUri ?? null
   );
+  // Optional patrol-session link. No patrol-tracking UI here (out of approved
+  // scope): the value is only preserved when a host supplies it via
+  // initialDraft (e.g. an active patrol session) so edits/retries never drop
+  // it. Trimmed on review; blank stays null.
+  const [patrolId] = useState<string | null>(
+    options?.initialDraft?.patrolId ?? null
+  );
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldIncidentErrors>({});
   const [attempted, setAttempted] = useState(false);
@@ -63,19 +70,23 @@ export function useFieldIncidentForm(
       incidentType,
       description,
       location,
-      photoUri
+      photoUri,
+      patrolId
     };
     const nextErrors = validateFieldIncident(draft);
     setErrors(nextErrors);
     setAttempted(true);
     if (Object.keys(nextErrors).length > 0) return null;
     if (!incidentType || !location) return null;
+    const trimmedPatrolId =
+      typeof patrolId === 'string' && patrolId.trim() !== '' ? patrolId.trim() : null;
     return {
       capturedAt,
       incidentType,
       description: description.trim(),
       location,
-      photoUri
+      photoUri,
+      patrolId: trimmedPatrolId
     };
   }
 
