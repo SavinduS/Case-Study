@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 interface Props {
   photoUri: string | null;
@@ -67,7 +67,7 @@ export default function PhotoPicker({ photoUri, photoError, disabled, onChange }
         </View>
       ) : (
         <Text style={styles.hint}>
-          Take a photo or choose from gallery. You can submit without a photo.
+          1 photo, max 5MB, JPEG/PNG. Optional — you can submit without a photo.
         </Text>
       )}
 
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   removeButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
     borderRadius: radius.sm,
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    minHeight: 46,
+    minHeight: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,

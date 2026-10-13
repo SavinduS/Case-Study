@@ -203,8 +203,7 @@ describe('DashboardPage', () => {
     const names = within(switcher)
       .getAllByRole('button')
       .map((b) => b.textContent.trim());
-    // Only the modules this use case owns; other members' modules stay in the rail,
-    // and the reports link is not a panel so it is not mirrored here.
+    // Only the modules this use case owns; other members' modules stay in the rail.
     expect(names).toEqual(['Tracked collars', 'Active alerts', 'Geofences']);
   });
 

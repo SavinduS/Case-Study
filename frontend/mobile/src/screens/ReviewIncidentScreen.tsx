@@ -5,13 +5,17 @@ import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
 import { FIELD_INCIDENT_LABELS, OFFLINE_MESSAGE } from '../constants/fieldIncident';
 import type { ValidatedFieldIncident } from '../fieldIncidentTypes';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 interface Props {
   incident: ValidatedFieldIncident;
   onEdit: () => void;
   onSubmit: () => void;
   onChangeLocation: () => void;
+  /** Permanent server rejection or storage failure to show above Submit. */
+  submitError?: string | null;
+  /** True while the report is being saved/uploaded. */
+  submitting?: boolean;
 }
 
 // F2: Review Incident — read-only summary of the F1 draft.
@@ -21,7 +25,9 @@ export default function ReviewIncidentScreen({
   incident,
   onEdit,
   onSubmit,
-  onChangeLocation
+  onChangeLocation,
+  submitError,
+  submitting
 }: Props) {
   const [lon, lat] = incident.location.coordinates;
 
@@ -64,8 +70,16 @@ export default function ReviewIncidentScreen({
       </Pressable>
 
       <View style={styles.buttonRow}>
-        <PrimaryButton label="Submit Report" onPress={onSubmit} />
+        <PrimaryButton
+          label={submitting ? 'Submitting…' : 'Submit Report'}
+          onPress={onSubmit}
+          disabled={submitting}
+          loading={submitting}
+        />
       </View>
+      {submitError ? (
+        <StatusBanner tone="error" title="Report needs attention" message={submitError} />
+      ) : null}
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"
@@ -120,7 +134,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   linkButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center'
   },
   linkText: {

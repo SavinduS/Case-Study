@@ -1,47 +1,103 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBanner from '../components/StatusBanner';
 import { FIELD_INCIDENT_LABELS } from '../constants/fieldIncident';
 import type { ValidatedFieldIncident } from '../fieldIncidentTypes';
 import { colors, font, radius, spacing } from '../theme';
 
+export type SubmitResultStatus = 'pending' | 'synced' | 'failed';
+
 interface Props {
   incident: ValidatedFieldIncident;
   onGoToMyIncidents: () => void;
   onNewReport: () => void;
+  /** Storage status of the saved report (Alt Flow 3 direct submit ⇒ synced). */
+  status?: SubmitResultStatus;
+  /** Server displayId (e.g. FI-2026-0001) when synchronized. */
+  displayId?: string | null;
+  /** Server rejection reason for the failed state (Exc Flow 1). */
+  submitError?: string | null;
+  /** Re-attempts submission of the same reportId (no duplicate created). */
+  onRetry?: () => void;
+  /** Returns to the form with the draft preserved for correction. */
+  onEditReport?: () => void;
 }
 
-// F2: Submit Result — offline confirmation. The report is saved on-device
-// with "Pending Synchronization" status; real sync lands in F3.
+// F2: Submit Result — offline confirmation, synchronized receipt, or failed
+// rejection. A synchronized report shows its server displayId (storyboard
+// panel 9); a failed report shows the rejection reason with Retry (same
+// reportId) and Edit Report actions instead of stranding the ranger.
 export default function SubmitResultScreen({
   incident,
   onGoToMyIncidents,
-  onNewReport
+  onNewReport,
+  status = 'pending',
+  displayId,
+  submitError,
+  onRetry,
+  onEditReport
 }: Props) {
+  const synced = status === 'synced';
+  const failed = status === 'failed';
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeIcon}>✓</Text>
+        <View style={[styles.badge, failed ? styles.badgeFailed : synced ? styles.badgeSynced : null]}>
+          <Text style={[styles.badgeIcon, failed ? styles.badgeIconFailed : synced ? styles.badgeIconSynced : null]}>
+            {failed ? '!' : '✓'}
+          </Text>
         </View>
-        <Text style={styles.title}>Report Saved Offline</Text>
+        <Text style={styles.title}>
+          {failed ? 'Report Not Accepted' : synced ? 'Report Synchronized' : 'Report Saved Offline'}
+        </Text>
         <Text style={styles.body}>
           {FIELD_INCIDENT_LABELS[incident.incidentType]} ·{' '}
           {new Date(incident.capturedAt).toLocaleString()}
         </Text>
+        {synced && displayId ? <Text style={styles.body}>{displayId}</Text> : null}
 
         <StatusBanner
-          tone="offline"
-          title="Report saved offline — Pending Synchronization"
-          message="It stays on this device and will sync when connectivity returns."
+          tone={failed ? 'error' : 'offline'}
+          title={
+            failed
+              ? 'Report rejected by the server'
+              : synced
+                ? 'Report synchronized'
+                : 'Report saved offline — Pending Synchronization'
+          }
+          message={
+            failed
+              ? (submitError ?? 'The server refused this report. Correct it or retry.')
+              : synced
+                ? 'The central database confirmed receipt.'
+                : 'It stays on this device and will sync when connectivity returns.'
+          }
         />
 
         <View style={styles.statusRow}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>PENDING SYNCHRONIZATION</Text>
+          <View style={[styles.statusDot, failed ? styles.statusDotFailed : synced ? styles.statusDotSynced : null]} />
+          <Text style={[styles.statusText, failed ? styles.statusTextFailed : synced ? styles.statusTextSynced : null]}>
+            {failed ? 'FAILED' : synced ? 'SYNCHRONIZED' : 'PENDING SYNCHRONIZATION'}
+          </Text>
         </View>
       </View>
+
+      {failed && onRetry ? (
+        <PrimaryButton label="Retry Submission" onPress={onRetry} />
+      ) : null}
+      {failed && onEditReport ? (
+        <View style={styles.secondaryWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit report"
+            onPress={onEditReport}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.secondaryText}>Edit Report</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <PrimaryButton label="Go to My Incidents" onPress={onGoToMyIncidents} />
       <View style={styles.secondaryWrap}>
@@ -84,6 +140,20 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800'
   },
+  badgeSynced: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary
+  },
+  badgeIconSynced: {
+    color: colors.primaryDark
+  },
+  badgeFailed: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger
+  },
+  badgeIconFailed: {
+    color: colors.danger
+  },
   title: {
     color: colors.text,
     fontSize: font.title,
@@ -109,10 +179,40 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.offlineText
   },
+  statusDotSynced: {
+    backgroundColor: colors.primary
+  },
+  statusDotFailed: {
+    backgroundColor: colors.danger
+  },
   statusText: {
     color: colors.offlineText,
     fontSize: font.section,
     fontWeight: '700'
+  },
+  statusTextSynced: {
+    color: colors.primaryDark
+  },
+  statusTextFailed: {
+    color: colors.danger
+  },
+  secondaryButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg
+  },
+  secondaryText: {
+    color: colors.primaryDark,
+    fontSize: font.section,
+    fontWeight: '700'
+  },
+  pressed: {
+    opacity: 0.7
   },
   secondaryWrap: {
     marginTop: spacing.sm

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, font, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, spacing } from '../theme';
 
 interface Props {
   onPress: () => void;
@@ -21,7 +21,7 @@ export default function SignOutButton({ onPress }: Props) {
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm
   },

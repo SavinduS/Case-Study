@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { GpsState } from '../services/location';
 import { sectorLabel } from '../services/sectors';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
 interface Props {
   gps: GpsState;
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs
   },
   changeButton: {
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
     paddingVertical: spacing.sm
   },

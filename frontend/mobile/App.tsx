@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets
@@ -9,59 +9,36 @@ import { fetchMe, login as apiLogin, NetworkError, registerVillager } from './sr
 import { destinationForRole } from './src/auth/roles';
 import { clearSession, loadSession, saveSession } from './src/auth/session';
 import type { AuthSession } from './src/auth/types';
-import TabBar, { RANGER_TABS } from './src/components/TabBar';
+import RangerIcon from './src/components/RangerIcon';
+import RangerSidebar, { type RangerNavId } from './src/components/RangerSidebar';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import LoginScreen from './src/screens/LoginScreen';
-import MyIncidentsScreen, { StoredFieldIncident } from './src/screens/MyIncidentsScreen';
+import MyIncidentsScreen from './src/screens/MyIncidentsScreen';
 import NewFieldIncidentScreen from './src/screens/NewFieldIncidentScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ReviewIncidentScreen from './src/screens/ReviewIncidentScreen';
 import SubmitResultScreen from './src/screens/SubmitResultScreen';
 import VillagerShell from './src/screens/VillagerShell';
 import WebDashboardScreen from './src/screens/WebDashboardScreen';
 import type { FieldIncidentDraft } from './src/fieldIncidentTypes';
+import { useRangerIncidents, viewForSubmitOutcome } from './src/hooks/useRangerIncidents';
+import type { StoredFieldIncident } from './src/services/incidentStorage';
 import type { GpsFix } from './src/services/location';
-import { colors, font, spacing } from './src/theme';
+import { colors, font, MIN_TOUCH_TARGET, spacing } from './src/theme';
 import type { ValidatedFieldIncident } from './src/fieldIncidentTypes';
 
 // Log Field Incident Offline flow only:
-// report (F1) -> review (F2) -> result (F2) -> myIncidents (F3).
-// pickLocation is a modal overlay from report/review when GPS fails.
+// myIncidents (F3, default) -> report (F1) -> review (F2) -> result (F2).
+// profile shows the signed-in ranger; pickLocation is a modal overlay from
+// report/review when GPS fails.
 // Ranger sign-in lands in this flow; Villager gets the conflict-report flow
 // (VillagerShell) and Manager/Officer are handed to the web dashboard.
-type AppView = 'report' | 'review' | 'result' | 'myIncidents' | 'pickLocation';
+type AppView = 'report' | 'review' | 'result' | 'myIncidents' | 'profile' | 'pickLocation';
 
 // Startup: the stored session is revalidated against the server before the
 // app trusts the role inside it.
 type BootState = 'checking' | 'signedOut' | 'signedIn';
-
-function seedInitialIncidents(): StoredFieldIncident[] {
-  const now = Date.now();
-  return [
-    {
-      id: 'pending-1',
-      status: 'pending',
-      incident: {
-        capturedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-        incidentType: 'elephant',
-        description: 'Elephant herd near the north boundary fence.',
-        location: { coordinates: [81.41, 6.47], manual: false },
-        photoUri: null
-      }
-    },
-    {
-      id: 'synced-1',
-      status: 'synced',
-      incident: {
-        capturedAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
-        incidentType: 'snare',
-        description: 'Snare wire found on the patrol trail.',
-        location: { coordinates: [81.38, 6.5], manual: true },
-        photoUri: null
-      }
-    }
-  ];
-}
 
 export default function App() {
   return (
@@ -215,19 +192,40 @@ function AppContent() {
 
   return (
     <SafeFrame>
-      <RangerShell onSignOut={() => void handleSignOut()} />
+      <RangerShell onSignOut={() => void handleSignOut()} token={session.token} user={session} />
     </SafeFrame>
   );
 }
 
 // Ranger home after sign-in: the offline field-incident flow.
-function RangerShell({ onSignOut }: { onSignOut: () => void }) {
-  const [view, setView] = useState<AppView>('report');
+// Incident Reports is the default landing page. All persistence goes
+// through incidentStorage via useRangerIncidents; there is no seed data and
+// no simulated sync, and no automatic connectivity sync. Navigation is the
+// left sidebar (fixed on wide screens, drawer on phones); the bottom tab bar
+// is villager-only and never rendered here.
+function RangerShell({ onSignOut, token, user }: { onSignOut: () => void; token: string; user: AuthSession }) {
+  const {
+    incidents: saved,
+    loading: incidentsLoading,
+    syncing,
+    submitting,
+    submitError,
+    syncError,
+    submitReport,
+    retryReport,
+    syncNow,
+    clearSubmitError
+  } = useRangerIncidents(token);
+  const [view, setView] = useState<AppView>('myIncidents');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
   const [manualFix, setManualFix] = useState<GpsFix | null>(null);
   const [reviewed, setReviewed] = useState<ValidatedFieldIncident | null>(null);
+  // Stable UUID of the report being edited (null for a brand-new report), so
+  // Edit Report never mints a new unique ID.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<StoredFieldIncident | null>(null);
-  const [saved, setSaved] = useState<StoredFieldIncident[]>(seedInitialIncidents);
-  const [syncing, setSyncing] = useState(false);
   const [pickReturnTo, setPickReturnTo] = useState<AppView>('report');
   // Bump to remount the form so "Edit Report" restores values cleanly.
   const [formKey, setFormKey] = useState(0);
@@ -241,12 +239,14 @@ function RangerShell({ onSignOut }: { onSignOut: () => void }) {
   }
 
   // F1 -> F2: Review Incident button passes validated form data.
+  // A fresh review starts a new report unless it came from Edit (editingId).
   function handleReview(incident: ValidatedFieldIncident) {
     setReviewed(incident);
     setView('review');
   }
 
-  // F2 -> F1: Edit Report navigates back with current values preserved.
+  // F2 -> F1: Edit Report navigates back with current values preserved,
+  // including the stable reportId so resubmission never duplicates.
   function handleEdit() {
     if (reviewed) {
       setEditDraft({
@@ -258,51 +258,92 @@ function RangerShell({ onSignOut }: { onSignOut: () => void }) {
       setManualFix({ coordinates: reviewed.location.coordinates });
       setFormKey((k) => k + 1);
     }
+    clearSubmitError();
     setView('report');
   }
 
-  // F2 -> F2 result: Submit Report saves offline and shows confirmation.
-  function handleSubmit() {
-    if (!reviewed) return;
-    const entry: StoredFieldIncident = {
-      id: `local-${Date.now()}`,
-      incident: reviewed,
-      status: 'pending'
-    };
-    setSaved((prev) => [entry, ...prev]);
-    setLastResult(entry);
+  // F2 -> result: offline-first submit. Offline (or network failure) keeps
+  // the report pending and shows the pending confirmation; a reachable server
+  // takes it directly (Alt Flow 3) and the result shows Synchronized. A
+  // permanent rejection (Exc Flow 1) goes to the result screen in its failed
+  // state (reason + Retry) instead of stranding the ranger on Review; a full
+  // device store keeps the draft (reviewed) intact for retry.
+  async function handleSubmit() {
+    if (!reviewed || submitting) return;
+    const outcome = await submitReport(reviewed, editingId);
+    if (viewForSubmitOutcome(outcome) === 'review') return;
+    if ('error' in outcome) {
+      if (!outcome.stored) return;
+      setLastResult(outcome.stored);
+      setView('result');
+      return;
+    }
+    setLastResult(outcome.stored);
+    setEditingId(null);
     setView('result');
+  }
+
+  // Result-screen Retry: re-attempts the same stored reportId (never a
+  // duplicate) and stays on the result screen showing the new outcome.
+  async function handleRetry() {
+    if (!lastResult || submitting) return;
+    const outcome = await retryReport(lastResult);
+    if ('error' in outcome) {
+      if (!outcome.stored) return;
+      setLastResult(outcome.stored);
+      return;
+    }
+    setLastResult(outcome.stored);
+    setEditingId(null);
+  }
+
+  // My Incidents per-row Retry: same path as result-screen retry; the list
+  // refreshes through the hook so the new badge shows in place.
+  function handleRowRetry(id: string) {
+    void (async () => {
+      const row = saved.find((i) => i.id === id || i.reportId === id);
+      if (!row) return;
+      await retryReport(row);
+    })();
   }
 
   function handleNewReport() {
     setReviewed(null);
+    setEditingId(null);
     setLastResult(null);
     setEditDraft(undefined);
     setManualFix(null);
+    clearSubmitError();
     setFormKey((k) => k + 1);
     setView('report');
   }
 
-  // F3 sync: flip all pending -> synchronized after a short delay.
+  // F3 sync: push pending rows; per-item failures stay on their rows.
   function handleSyncNow() {
-    if (syncing) return;
-    setSyncing(true);
-    setTimeout(() => {
-      setSaved((prev) => prev.map((item) => ({ ...item, status: 'synced' as const })));
-      setSyncing(false);
-    }, 1200);
+    void syncNow();
   }
 
-  function handleTabSelect(tabId: string) {
-    if (tabId === 'report') setView('report');
-    else if (tabId === 'myIncidents') setView('myIncidents');
+  // Sidebar: Incident Reports first, Add New Incident second, Sync Reports
+  // triggers the real manual sync below, Ranger Profile shows the signed-in
+  // user, Logout reuses existing auth sign-out.
+  function handleSidebarSelect(id: RangerNavId) {
+    setDrawerOpen(false);
+    if (id === 'incidents') setView('myIncidents');
+    else if (id === 'report') handleNewReport();
+    else if (id === 'profile') setView('profile');
+    else if (id === 'sync') {
+      setView('myIncidents');
+      handleSyncNow();
+    }
   }
 
-  const tabActive = view === 'myIncidents' ? 'myIncidents' : 'report';
+  const sidebarActive =
+    view === 'myIncidents' ? 'incidents' : view === 'profile' ? 'profile' : 'report';
+  const pendingCount = saved.filter((i) => i.status === 'pending').length;
 
-  return (
-    <View style={styles.content}>
-      {view === 'pickLocation' ? (
+  if (view === 'pickLocation') {
+    return (
+      <View style={styles.content}>
         <LocationPickerScreen
           initialFix={manualFix}
           initialManual={manualFix !== null}
@@ -312,16 +353,29 @@ function RangerShell({ onSignOut }: { onSignOut: () => void }) {
           }}
           onCancel={() => setView(pickReturnTo === 'pickLocation' ? 'report' : pickReturnTo)}
         />
-      ) : view === 'review' && reviewed ? (
+      </View>
+    );
+  }
+
+  const body = (
+    <View style={styles.body}>
+      {view === 'review' && reviewed ? (
         <ReviewIncidentScreen
           incident={reviewed}
           onEdit={handleEdit}
-          onSubmit={handleSubmit}
+          onSubmit={() => void handleSubmit()}
           onChangeLocation={() => openPicker('review')}
+          submitError={submitError}
+          submitting={submitting}
         />
       ) : view === 'result' && lastResult ? (
         <SubmitResultScreen
           incident={lastResult.incident}
+          status={lastResult.status}
+          displayId={lastResult.displayId ?? null}
+          submitError={lastResult.lastError ?? submitError}
+          onRetry={() => void handleRetry()}
+          onEditReport={handleEdit}
           onGoToMyIncidents={() => setView('myIncidents')}
           onNewReport={handleNewReport}
         />
@@ -329,9 +383,14 @@ function RangerShell({ onSignOut }: { onSignOut: () => void }) {
         <MyIncidentsScreen
           incidents={saved}
           syncing={syncing}
+          syncError={syncError}
+          loading={incidentsLoading}
           onSyncNow={handleSyncNow}
           onNewReport={handleNewReport}
+          onRetryReport={handleRowRetry}
         />
+      ) : view === 'profile' ? (
+        <ProfileScreen user={user} onSignOut={onSignOut} />
       ) : (
         <NewFieldIncidentScreen
           key={formKey}
@@ -341,14 +400,63 @@ function RangerShell({ onSignOut }: { onSignOut: () => void }) {
           onOpenManualLocation={() => openPicker('report')}
         />
       )}
-      {view === 'pickLocation' ? null : (
-        <TabBar
-          tabs={RANGER_TABS}
-          active={tabActive}
-          onSelect={handleTabSelect}
+    </View>
+  );
+
+  // Desktop/tablet landscape: fixed left sidebar, no bottom bar.
+  if (isWide) {
+    return (
+      <View style={styles.wideRow}>
+        <RangerSidebar
+          active={sidebarActive}
+          syncing={syncing}
+          pendingCount={pendingCount}
+          user={user}
+          onSelect={handleSidebarSelect}
           onSignOut={onSignOut}
         />
-      )}
+        {body}
+      </View>
+    );
+  }
+
+  // Phone: compact top bar with a drawer; the bottom tab bar stays
+  // villager-only and is never rendered in the Ranger layout.
+  return (
+    <View style={styles.content}>
+      <View style={styles.compactBar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open navigation menu"
+          onPress={() => setDrawerOpen(true)}
+          style={({ pressed }) => [styles.menuButton, pressed && styles.menuPressed]}
+        >
+          <RangerIcon name="menu" size={24} color={colors.white} />
+        </Pressable>
+        <Text style={styles.compactTitle}>Ranger Dashboard</Text>
+        <View style={styles.compactSpacer} />
+      </View>
+      {body}
+      {drawerOpen ? (
+        <View style={styles.drawerOverlay}>
+          <View style={styles.drawerPanel}>
+            <RangerSidebar
+              active={sidebarActive}
+              syncing={syncing}
+              pendingCount={pendingCount}
+              user={user}
+              onSelect={handleSidebarSelect}
+              onSignOut={onSignOut}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close navigation menu"
+            onPress={() => setDrawerOpen(false)}
+            style={styles.drawerScrim}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -361,6 +469,58 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.bg
+  },
+  body: {
+    flex: 1,
+    backgroundColor: colors.bg
+  },
+  wideRow: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.bg
+  },
+  compactBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryDark,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minHeight: 52
+  },
+  menuButton: {
+    minWidth: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8
+  },
+  menuPressed: {
+    backgroundColor: 'rgba(255,255,255,0.15)'
+  },
+  compactTitle: {
+    color: colors.white,
+    fontSize: font.section,
+    fontWeight: '800',
+    marginLeft: 4
+  },
+  compactSpacer: {
+    flex: 1
+  },
+  drawerOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row'
+  },
+  drawerScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)'
+  },
+  drawerPanel: {
+    width: 248,
+    backgroundColor: colors.primaryDark
   },
   boot: {
     flex: 1,

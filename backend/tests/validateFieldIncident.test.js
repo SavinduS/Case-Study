@@ -267,11 +267,11 @@ describe('validateFieldIncident (F1)', () => {
   });
 
   describe('photo', () => {
-    test('rejects a missing photo', () => {
+    test('photo is optional (mobile decision)', () => {
       const { photo: _drop, ...rest } = validPayload();
       const result = validateFieldIncident(rest);
-      expect(result.ok).toBe(false);
-      expect(result.errors.find((e) => e.field === 'photo').message).toBe('Photo is required');
+      expect(result.ok).toBe(true);
+      expect(result.value.photo).toBeUndefined();
     });
 
     test.each([['PDF', 'application/pdf'], ['GIF', 'image/gif'], ['WebP', 'image/webp']])(

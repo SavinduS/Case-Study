@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { validateFieldIncident } from '../services/validateFieldIncident';
+import { validatePhotoUriAsync } from '../services/validatePhoto';
 import type {
   FieldIncidentDraft,
   FieldIncidentErrors,
@@ -48,13 +49,30 @@ export function useFieldIncidentForm(
   const [photoUri, setPhotoUriState] = useState<string | null>(
     options?.initialDraft?.photoUri ?? null
   );
+  // Optional patrol-session link. No patrol-tracking UI here (out of approved
+  // scope): the value is only preserved when a host supplies it via
+  // initialDraft (e.g. an active patrol session) so edits/retries never drop
+  // it. Trimmed on review; blank stays null.
+  const [patrolId] = useState<string | null>(
+    options?.initialDraft?.patrolId ?? null
+  );
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldIncidentErrors>({});
   const [attempted, setAttempted] = useState(false);
+  // Latest photo URI: guards the async size/type check below so a slow
+  // lookup for a removed photo can never flag the current (empty) value.
+  const latestPhotoUri = useRef<string | null>(options?.initialDraft?.photoUri ?? null);
 
   function handlePhotoChange(uri: string | null) {
+    latestPhotoUri.current = uri;
     setPhotoUriState(uri);
     setPhotoError(null);
+    if (!uri) return;
+    // Async size/type validation surfaces inline on the form (before Review);
+    // unknown sizes stay allowed and the server (413/415) remains authoritative.
+    void validatePhotoUriAsync(uri).then((error) => {
+      if (latestPhotoUri.current === uri) setPhotoError(error);
+    });
   }
 
   function review(location: FieldIncidentLocation | null): ValidatedFieldIncident | null {
@@ -63,19 +81,26 @@ export function useFieldIncidentForm(
       incidentType,
       description,
       location,
-      photoUri
+      photoUri,
+      patrolId
     };
     const nextErrors = validateFieldIncident(draft);
+    // Fold a resolved async photo error (e.g. oversize file) into the sync
+    // errors so Review blocks with the inline message already shown.
+    if (!nextErrors.photo && photoError) nextErrors.photo = photoError;
     setErrors(nextErrors);
     setAttempted(true);
     if (Object.keys(nextErrors).length > 0) return null;
     if (!incidentType || !location) return null;
+    const trimmedPatrolId =
+      typeof patrolId === 'string' && patrolId.trim() !== '' ? patrolId.trim() : null;
     return {
       capturedAt,
       incidentType,
       description: description.trim(),
       location,
-      photoUri
+      photoUri,
+      patrolId: trimmedPatrolId
     };
   }
 

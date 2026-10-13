@@ -33,7 +33,10 @@ export class NetworkError extends Error {
   }
 }
 
-async function request<T>(
+// Shared request helper (20s timeout, base-URL resolution, ApiError for HTTP
+// failures / NetworkError when unreachable). Exported for the field-incident
+// API module so every endpoint shares timeout and error handling.
+export async function request<T>(
   path: string,
   options: RequestInit = {},
   token?: string

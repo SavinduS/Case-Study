@@ -10,7 +10,7 @@ import type { FieldIncidentDraft } from '../fieldIncidentTypes.ts';
 function baseDraft(): FieldIncidentDraft {
   return {
     capturedAt: new Date('2026-06-20T10:24:00.000Z').toISOString(),
-    incidentType: 'snare',
+    incidentType: 'snare_illegal_hunting',
     description: 'Illegal wire snare found near the game trail. No animals caught.',
     location: {
       coordinates: [36.821456, -1.292345],

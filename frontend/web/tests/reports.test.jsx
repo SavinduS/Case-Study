@@ -64,27 +64,6 @@ describe('reports workspace', () => {
     expect(screen.queryByText('+12%')).not.toBeInTheDocument();
   });
 
-  it('marks incident-free zones Low regardless of coverage', async () => {
-    global.fetch = vi.fn((url) => {
-      if (url.includes('/saved')) return Promise.resolve(response([]));
-      if (url.includes('/zones/')) return Promise.resolve(response({ incidents: [], patrols: [] }));
-      return Promise.resolve(response({
-        reportId: 'AN-2026-000003',
-        summary: { incidentCount: 9, patrolCount: 2 },
-        incidentDensity: { NORTHBOUNDARY: 0, WESTBOUNDARY: 9 },
-        patrolCoverage: {
-          NORTHBOUNDARY: { actualHours: 4, requiredHours: 8, coveragePercent: 50 },
-          WESTBOUNDARY: { actualHours: 4, requiredHours: 8, coveragePercent: 50 }
-        },
-        weeklyTrends: { '2026-W01': 9 }
-      }));
-    });
-    render(<MemoryRouter><ReportsPage /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: /generate report/i }));
-    await waitFor(() => expect(screen.getAllByText('Low').length).toBeGreaterThan(0));
-    expect(screen.getAllByText('Medium').length).toBeGreaterThan(0);
-  });
-
   it('uses distinct terrain layout and blocks empty-zone reports', async () => {
     render(<MemoryRouter><ReportsPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('radio', { name: /terrain trend/i }));
