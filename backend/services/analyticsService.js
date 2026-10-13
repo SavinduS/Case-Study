@@ -44,6 +44,13 @@ function parseCriteria(input = {}) {
   if (baseline !== undefined && baseline !== null && baseline !== false) {
     if (typeof baseline === 'number' && (!Number.isFinite(baseline) || baseline <= 0)) throw invalid('baseline must be positive');
     if (typeof baseline === 'object' && (!baseline.startDate || !baseline.endDate)) throw invalid('baseline requires startDate and endDate');
+    // Only the values the reports UI can send are accepted. Anything else used to
+// fall through to the default window silently, so a typo produced a
+// comparison against a period the manager never chose.
+const BASELINE_STRINGS = ['previous-period', 'previous-year'];
+if (typeof baseline === 'string' && !BASELINE_STRINGS.includes(baseline)) {
+      throw invalid(`baseline must be one of: ${BASELINE_STRINGS.join(', ')}, a positive number of days, or an explicit startDate/endDate`);
+    }
     if (typeof baseline === 'object') {
       const bs = new Date(baseline.startDate); const be = new Date(baseline.endDate);
       if (Number.isNaN(bs.valueOf()) || Number.isNaN(be.valueOf()) || be < bs) throw invalid('baseline dates must be valid and ordered');
@@ -64,19 +71,71 @@ function sectorForIncident(incident) {
   return coords && coords.length >= 2 ? findNearestSector(coords[0], coords[1]).code : null;
 }
 
+/**
+ * ISO-8601 week number (the "2026-W11" form), used to bucket incidents into
+ * weekly trend points.
+ *
+ * The week starts on Monday. Shifting the date by 3 days minus the weekday
+ * offset puts every day of a week on the same day, so the Thursday of that
+ * week identifies it; ISO weeks are numbered by the year containing that
+ * Thursday, which is why a late-December date can legitimately belong to week
+ * 1 of the next year.
+ */
 function isoWeek(date) {
-  const d = new Date(date); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return `${d.getFullYear()}-W${String(1 + Math.round(((d - week1) / day - 3 + ((week1.getDay() + 6) % 7)) / 7)).padStart(2, '0')}`;
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3); // Thursday of this ISO week
+  const isoYear = d.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+  const firstThursday = new Date(jan4);
+  firstThursday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + 3);
+  const week = 1 + Math.round((d - firstThursday) / (7 * day));
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
 }
 
-function configuredHours() {
+// Management patrol target per zone. Primary source is the ZoneSetting
+// collection (Zone settings page); server env stays as deployment fallback.
+const DEFAULT_REQUIRED_HOURS = 8;
+
+function envRequiredHours() {
+  const base = Object.fromEntries(SECTORS.map((s) => [s.code, null]));
   try {
     const value = process.env.REQUIRED_SECTOR_HOURS;
-    if (value) return { ...Object.fromEntries(SECTORS.map((s) => [s.code, 0])), ...JSON.parse(value) };
-  } catch { /* use defaults */ }
-  return Object.fromEntries(SECTORS.map((s) => [s.code, Number(process.env[`REQUIRED_HOURS_${s.code}`] || 0)]));
+    if (value) return { ...base, ...JSON.parse(value) };
+  } catch { /* fall through to per-zone vars */ }
+  SECTORS.forEach((s) => {
+    const raw = process.env[`REQUIRED_HOURS_${s.code}`];
+    if (raw !== undefined && raw !== '') base[s.code] = Number(raw);
+  });
+  return base;
+}
+
+function mergeRequiredHours(dbDocs, envMap) {
+  const merged = {};
+  SECTORS.forEach((s) => {
+    const fromDb = dbDocs.find((d) => normalizeSectorCode(d.code) === s.code);
+    const dbValue = fromDb ? Number(fromDb.requiredHours) : NaN;
+    const envValue = envMap ? Number(envMap[s.code]) : NaN;
+    merged[s.code] = Number.isFinite(dbValue)
+      ? dbValue
+      : (Number.isFinite(envValue) ? envValue : DEFAULT_REQUIRED_HOURS);
+  });
+  return merged;
+}
+
+async function getRequiredHours() {
+  try {
+    const ZoneSetting = require('../models/ZoneSetting');
+    const docs = await ZoneSetting.find({}).lean();
+    return mergeRequiredHours(docs, envRequiredHours());
+  } catch {
+    return mergeRequiredHours([], envRequiredHours());
+  }
+}
+
+// Kept for backwards compatibility (tests / callers without DB access).
+function configuredHours() {
+  return mergeRequiredHours([], envRequiredHours());
 }
 
 function dateKey(date) { return new Date(date).toISOString().slice(0, 10); }
@@ -94,6 +153,9 @@ function periodBounds(criteria) {
     endExclusive.setUTCFullYear(endExclusive.getUTCFullYear() - 1);
     return { start, endExclusive };
   }
+  // 'previous-period' and a numeric lookback both mean "the window immediately
+  // before this one": a fixed length for the numeric form, the length of the
+  // selected window itself for previous-period.
   const length = typeof criteria.baseline === 'number'
     ? criteria.baseline * day
     : criteria.endExclusive - criteria.startDate;
@@ -166,7 +228,7 @@ async function generateAnalytics(rawCriteria, userId) {
   const zones = criteria.zones.length ? criteria.zones : SECTORS.map((s) => s.code);
   const current = aggregate(incidents, patrols, zones, criteria.startDate, criteria.endExclusive);
   const counts = current.counts; const hours = current.hours; const weekly = current.weekly;
-  const required = configuredHours();
+  const required = await getRequiredHours();
   const coverage = zones.map((z) => ({
     [z]: { requiredHours: Number(required[z] || 0), actualHours: Number(hours[z].toFixed(2)),
       coveragePercent: required[z] ? Number(Math.min(100, (hours[z] / required[z]) * 100).toFixed(2)) : null }
@@ -234,4 +296,24 @@ async function generateAnalytics(rawCriteria, userId) {
   return report;
 }
 
-module.exports = { parseCriteria, generateAnalytics, incidentCategories, sectorForIncident, noData };
+<<<<<<< Updated upstream
+// The internals are exported so the formulas this module is responsible for
+// can be tested directly instead of only through generateAnalytics, which
+// would need database fixtures for every arithmetic edge case.
+module.exports = {
+  parseCriteria,
+  generateAnalytics,
+  incidentCategories,
+  sectorForIncident,
+  noData,
+  aggregate,
+  variance,
+  periodBounds,
+  direction,
+  configuredHours,
+  isoWeek,
+  toAnalyticsIncident
+};
+=======
+module.exports = { parseCriteria, generateAnalytics, incidentCategories, sectorForIncident, noData, getRequiredHours, mergeRequiredHours, DEFAULT_REQUIRED_HOURS };
+>>>>>>> Stashed changes

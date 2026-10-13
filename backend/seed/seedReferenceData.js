@@ -5,6 +5,10 @@ const Geofence = require('../models/Geofence');
 const Collar = require('../models/Collar');
 const RangerTeam = require('../models/RangerTeam');
 const User = require('../models/User');
+const ZoneSetting = require('../models/ZoneSetting');
+const { SECTORS } = require('../config/areas');
+const { DEFAULT_REQUIRED_HOURS } = require('../services/analyticsService');
+
 const { PARK, GEOFENCES, COLLARS, RANGER_TEAMS } = require('./referenceData');
 const { DEMO_PASSWORD, DEMO_USERS, hashDemoUsers } = require('./demoUsers');
 
@@ -40,12 +44,25 @@ async function seed() {
   // Login keeps the existing id when a demo user already exists, so tokens
   // issued earlier stay valid across a re-seed.
   const users = await upsertAll(User, 'phone', await hashDemoUsers());
+  // Zone patrol targets: insert defaults only, never overwrite a manager's edits.
+  const zoneOps = SECTORS.map((s) => ({
+    updateOne: {
+      filter: { code: s.code },
+      update: { $set: { name: s.name }, $setOnInsert: { requiredHours: DEFAULT_REQUIRED_HOURS } },
+      upsert: true
+    }
+  }));
+  const zoneResult = await ZoneSetting.bulkWrite(zoneOps);
+  const zonesSet = zoneResult.upsertedCount;
+
 
   console.log(`  Park:            ${park} (${PARK.name})`);
   console.log(`  Geofences:       ${zones} high-risk zones`);
   console.log(`  Collars:         ${collars} tracked animals`);
   console.log(`  Ranger teams:    ${teams}`);
   console.log(`  Demo users:      ${users} (one per role, password "${DEMO_PASSWORD}")`);
+  console.log(`  Zone settings:   ${zonesSet} defaults inserted (${DEFAULT_REQUIRED_HOURS}h per zone)`);
+
   console.log('Seed complete.');
 }
 
